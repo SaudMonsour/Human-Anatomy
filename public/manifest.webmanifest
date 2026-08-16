@@ -1,0 +1,11 @@
+{
+  "name": "MuscleMap",
+  "short_name": "MuscleMap",
+  "description": "Precise muscle-head anatomy, exercises and strength tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": []
+}
