@@ -1,11 +1,12 @@
 {
   "name": "musclemap",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "check:data": "node scripts/validate-data.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,9 +20,6 @@
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "typescript": "latest",
-    "tailwindcss": "^3.4.17",
-    "autoprefixer": "latest",
-    "postcss": "latest"
+    "typescript": "latest"
   }
 }
