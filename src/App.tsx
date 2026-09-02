@@ -34,6 +34,7 @@ import {
   type Exercise,
   type Muscle,
 } from './data'
+import { AnatomyBody, anatomyRegionCount } from './AnatomyBody'
 
 const ProgressCharts = lazy(() => import('./ProgressCharts'))
 
@@ -338,16 +339,16 @@ function ExploreScreen({
             <button className={side === 'front' ? 'selected' : ''} onClick={() => setSide('front')}>Front</button>
             <button className={side === 'back' ? 'selected' : ''} onClick={() => setSide('back')}>Back</button>
           </div>
-          <div className="view-label"><Layers3 size={16} /> {visible.length} visible regions</div>
+          <div className="view-label"><Layers3 size={16} /> {anatomyRegionCount(side)} anatomical regions</div>
         </div>
 
         <div className="group-filter" aria-label="Filter muscle groups">
           {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => setGroup(item)}>{item}</button>)}
         </div>
 
-        <BodyDiagram
+        <AnatomyBody
           side={side}
-          muscles={visible}
+          visibleMuscles={visible}
           selectedMuscleId={selectedMuscleId}
           onSelect={openMuscle}
         />
@@ -370,62 +371,6 @@ function ExploreScreen({
         </div>
         <div className="panel-tip"><Target size={17} /><span>Select another highlighted region to compare its role and exercise options.</span></div>
       </aside>
-    </div>
-  )
-}
-
-function BodyDiagram({
-  side,
-  muscles: visibleMuscles,
-  selectedMuscleId,
-  onSelect,
-}: {
-  side: BodySide
-  muscles: Muscle[]
-  selectedMuscleId: string
-  onSelect: (muscle: Muscle) => void
-}) {
-  return (
-    <div className="body-stage">
-      <div className="orientation"><span>{side === 'front' ? 'Anterior' : 'Posterior'}</span><small>{side === 'front' ? 'Front' : 'Back'} view</small></div>
-      <svg viewBox="55 35 190 555" className="body-svg" role="img" aria-label={`${side} muscle anatomy map`}>
-        <g className="body-base">
-          <circle cx="150" cy="72" r="32" />
-          <path d="M133 102 L167 102 L176 125 Q190 132 194 160 L184 303 Q177 326 166 344 L134 344 Q123 326 116 303 L106 160 Q110 132 124 125 Z" />
-          <path d="M108 150 Q91 158 86 188 L72 317 Q72 330 84 333 Q97 335 101 320 L120 205 Z" />
-          <path d="M192 150 Q209 158 214 188 L228 317 Q228 330 216 333 Q203 335 199 320 L180 205 Z" />
-          <path d="M134 336 Q118 366 117 404 L112 554 Q112 575 128 578 Q143 580 145 559 L151 410 L151 348 Z" />
-          <path d="M166 336 Q182 366 183 404 L188 554 Q188 575 172 578 Q157 580 155 559 L149 410 L149 348 Z" />
-        </g>
-        <g className="anatomy-guides" aria-hidden="true">
-          <path d="M150 108 L150 338" />
-          <path d="M124 181 Q150 191 176 181" />
-          <path d="M126 285 Q150 296 174 285" />
-          <path d="M120 407 Q150 417 180 407" />
-        </g>
-        <g>
-          {visibleMuscles.map((muscle) => (
-            <path
-              key={muscle.id}
-              d={muscle.path}
-              className={`muscle-path ${selectedMuscleId === muscle.id ? 'selected' : ''}`}
-              tabIndex={0}
-              role="button"
-              aria-label={`${muscle.name}, ${muscle.group}`}
-              onClick={() => onSelect(muscle)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onSelect(muscle)
-                }
-              }}
-            >
-              <title>{muscle.name}</title>
-            </path>
-          ))}
-        </g>
-      </svg>
-      <div className="diagram-hint"><span className="pulse-dot" /> Select a highlighted region</div>
     </div>
   )
 }

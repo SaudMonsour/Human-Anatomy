@@ -86,17 +86,24 @@ button { border: 0; cursor: pointer; }
 .group-filter button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-soft); border-radius: 999px; background: transparent; color: var(--muted-2); font-size: .72rem; font-weight: 700; }
 .group-filter button.selected { color: #101a08; border-color: var(--lime); background: var(--lime); }
 
-.body-stage { min-height: 600px; margin-top: 10px; border-radius: 17px; border: 1px solid var(--line-soft); overflow: hidden; position: relative; display: grid; place-items: center; background-color: #091914; background-image: linear-gradient(rgba(91, 154, 134, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(91, 154, 134, .055) 1px, transparent 1px), radial-gradient(circle at 50% 44%, rgba(83, 181, 150, .13), transparent 42%); background-size: 32px 32px, 32px 32px, auto; }
+.body-stage { min-height: 640px; margin-top: 10px; border-radius: 17px; border: 1px solid var(--line-soft); overflow: hidden; position: relative; display: grid; place-items: center; isolation: isolate; background-color: #071511; background-image: linear-gradient(rgba(91, 154, 134, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(91, 154, 134, .045) 1px, transparent 1px), radial-gradient(circle at 50% 42%, rgba(143, 58, 52, .14), transparent 39%), radial-gradient(circle at 50% 48%, rgba(83, 181, 150, .1), transparent 63%); background-size: 32px 32px, 32px 32px, auto, auto; }
+.body-stage::before { content: ''; position: absolute; inset: 7% 18% 10%; z-index: -1; border-radius: 50%; background: rgba(1, 8, 6, .36); filter: blur(30px); }
 .orientation { position: absolute; left: 18px; top: 16px; z-index: 1; }
 .orientation span, .orientation small { display: block; }
 .orientation span { font-size: .74rem; font-weight: 800; color: var(--mint); text-transform: uppercase; letter-spacing: .12em; }
 .orientation small { margin-top: 4px; color: var(--muted-2); font-size: .72rem; }
-.body-svg { width: min(100%, 390px); height: 565px; overflow: visible; filter: drop-shadow(0 24px 28px rgba(0, 0, 0, .22)); }
-.body-base { fill: #152b25; stroke: #2e4d43; stroke-width: 1.25; }
-.anatomy-guides { fill: none; stroke: #35574c; stroke-width: .8; stroke-dasharray: 3 5; opacity: .58; }
-.muscle-path { fill: #519783; fill-opacity: .47; stroke: #73b8a5; stroke-width: .8; cursor: pointer; transition: fill .18s ease, fill-opacity .18s ease, stroke .18s ease, filter .18s ease; transform-box: fill-box; transform-origin: center; }
-.muscle-path:hover, .muscle-path:focus-visible { fill: var(--mint); fill-opacity: .72; stroke: #b2ffe9; filter: drop-shadow(0 0 8px rgba(100, 216, 188, .28)); }
-.muscle-path.selected { fill: var(--lime); fill-opacity: .92; stroke: #eaffab; stroke-width: 1.5; filter: drop-shadow(0 0 11px rgba(200, 255, 61, .38)); }
+.anatomy-figure { width: min(100%, 438px); height: 590px; padding: 20px 30px 14px; display: grid; place-items: center; }
+.body-svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 26px 30px rgba(0, 0, 0, .44)); }
+.anatomy-shadow { fill: #150d0c; opacity: .75; transform: translateY(.55px); }
+.anatomy-region { fill: url(#muscle-tone); fill-opacity: .72; stroke: #e28a79; stroke-opacity: .32; stroke-width: .12; pointer-events: none; transition: fill .18s ease, fill-opacity .18s ease, stroke .18s ease, filter .18s ease, transform .18s ease; transform-box: fill-box; transform-origin: center; }
+.anatomy-region.interactive { fill-opacity: .94; stroke-opacity: .55; pointer-events: auto; cursor: pointer; }
+.anatomy-region.interactive:hover, .anatomy-region.interactive:focus-visible { fill: #e27a65; fill-opacity: 1; stroke: #ffd0c6; stroke-opacity: .9; stroke-width: .25; outline: none; filter: drop-shadow(0 0 2px rgba(255, 154, 132, .55)); transform: scale(1.012); }
+.anatomy-region.selected { fill: var(--lime); fill-opacity: 1; stroke: #f3ffc9; stroke-opacity: 1; stroke-width: .3; filter: url(#muscle-glow); }
+.anatomy-key { position: absolute; right: 16px; top: 17px; display: grid; gap: 7px; color: var(--muted-2); font-size: .65rem; }
+.anatomy-key span { display: flex; align-items: center; gap: 7px; }
+.anatomy-key i { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .18); }
+.key-selected { background: var(--lime); }
+.key-muscle { background: #a8463e; }
 .diagram-hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); min-width: max-content; height: 36px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(7, 17, 15, .86); backdrop-filter: blur(12px); display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .72rem; font-weight: 650; }
 .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 0 rgba(200, 255, 61, .5); animation: pulse 2.2s infinite; }
 
@@ -303,9 +310,11 @@ button { border: 0; cursor: pointer; }
   .explorer-toolbar { align-items: stretch; }
   .segmented { width: 176px; }
   .view-label { font-size: .67rem; }
-  .body-stage { min-height: 520px; }
-  .body-svg { height: 500px; width: min(100%, 330px); }
+  .body-stage { min-height: 560px; }
+  .anatomy-figure { width: min(100%, 360px); height: 520px; padding: 34px 24px 40px; }
+  .body-svg { width: 100%; height: 100%; }
   .orientation { left: 12px; top: 12px; }
+  .anatomy-key { right: 12px; top: 13px; }
   .muscle-panel { padding: 20px; }
   .week-overview { padding: 18px; gap: 15px; }
   .week-ring { width: 88px; height: 88px; }
