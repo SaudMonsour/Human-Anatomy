@@ -4,8 +4,8 @@
   "description": "Interactive muscle anatomy and strength tracking.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07110f",
-  "theme_color": "#07110f",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "orientation": "any",
   "icons": []
 }

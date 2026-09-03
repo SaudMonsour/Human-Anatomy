@@ -4,7 +4,7 @@ MuscleMap is a responsive anatomy and strength-training tool built with React, T
 
 ## What it includes
 
-- Detailed interactive front and back maps with 89 anatomical regions
+- Detailed interactive front and back muscle maps with traced muscle overlays
 - Search across 34 muscle regions and 66 exercises
 - Exercise setup cues and common-mistake guidance
 - Four-day upper/lower program with weekly completion tracking
@@ -35,4 +35,7 @@ Workout history, preferences, and weekly completion are stored in the browser's 
 
 ## Anatomy artwork
 
-The detailed anterior and posterior muscle vectors are provided by [body-muscles](https://github.com/vulovix/body-muscles), Copyright 2024 Ivan Vulović, under the Apache License 2.0. See `THIRD_PARTY_NOTICES.md`.
+The illustrated body artwork and traced muscle masks are adapted from
+[js-rich-body-highlighter](https://github.com/crmapache/js-rich-body-highlighter),
+Copyright 2026 js-rich-body-highlighter contributors, under the MIT License.
+The source and license notice are recorded in `THIRD_PARTY_NOTICES.md`.

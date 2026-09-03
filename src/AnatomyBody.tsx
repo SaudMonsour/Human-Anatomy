@@ -1,142 +1,119 @@
-import { BACK_MUSCLES, FRONT_MUSCLES, type MuscleDef } from 'body-muscles'
+import type { ReactNode } from 'react'
 import { muscleById, type BodySide, type Muscle } from './data'
+import { RICH_BACK_MUSCLES } from './richAnatomyBack'
+import { RICH_FRONT_MUSCLES } from './richAnatomyFront'
+import type { RichMuscleDefinition } from './richAnatomyTypes'
 
-const anatomyToMuscle: Record<string, string> = {
-  'shoulder-front-left': 'deltoid-anterior',
-  'shoulder-front-right': 'deltoid-anterior',
-  'shoulder-side-left': 'deltoid-lateral',
-  'shoulder-side-right': 'deltoid-lateral',
-  'biceps-left': 'biceps-long',
-  'biceps-right': 'biceps-long',
-  'forearm-left': 'forearm-flexors',
-  'forearm-right': 'forearm-flexors',
-  'chest-upper-left': 'chest-upper',
-  'chest-upper-right': 'chest-upper',
-  'chest-lower-left': 'chest-lower',
-  'chest-lower-right': 'chest-lower',
-  'abs-upper-left': 'abs-upper',
-  'abs-upper-right': 'abs-upper',
-  'abs-lower-left': 'abs-lower',
-  'abs-lower-right': 'abs-lower',
-  'obliques-left': 'obliques',
-  'obliques-right': 'obliques',
-  'quads-left': 'quad-rectus',
-  'quads-right': 'quad-rectus',
-  'traps-upper-left': 'upper-traps',
-  'traps-upper-right': 'upper-traps',
-  'traps-mid-left': 'mid-traps',
-  'traps-mid-right': 'mid-traps',
-  'traps-lower-left': 'lower-traps',
-  'traps-lower-right': 'lower-traps',
-  'lats-upper-left': 'lats',
-  'lats-upper-right': 'lats',
-  'lats-mid-left': 'lats',
-  'lats-mid-right': 'lats',
-  'lats-lower-left': 'lats',
-  'lats-lower-right': 'lats',
-  'deltoid-rear-left': 'deltoid-posterior',
-  'deltoid-rear-right': 'deltoid-posterior',
-  'triceps-long-left': 'triceps-long',
-  'triceps-long-right': 'triceps-long',
-  'triceps-lateral-left': 'triceps-lateral',
-  'triceps-lateral-right': 'triceps-lateral',
-  'forearm-flexors-left': 'forearm-flexors',
-  'forearm-flexors-right': 'forearm-flexors',
-  'forearm-extensors-left': 'forearm-extensors',
-  'forearm-extensors-right': 'forearm-extensors',
-  'spine': 'erectors',
-  'lower-back-erectors-left': 'erectors',
-  'lower-back-erectors-right': 'erectors',
-  'gluteus-medius-left': 'glute-med',
-  'gluteus-medius-right': 'glute-med',
-  'gluteus-maximus-left': 'glute-max',
-  'gluteus-maximus-right': 'glute-max',
-  'calves-gastroc-medial-left': 'calf-medial',
-  'calves-gastroc-medial-right': 'calf-medial',
-  'calves-gastroc-lateral-left': 'calf-lateral',
-  'calves-gastroc-lateral-right': 'calf-lateral',
-  'calves-soleus-left': 'soleus',
-  'calves-soleus-right': 'soleus',
-  'hamstrings-lateral-left': 'ham-biceps',
-  'hamstrings-lateral-right': 'ham-biceps',
-  'hamstrings-medial-left': 'ham-semitendinosus',
-  'hamstrings-medial-right': 'ham-semitendinosus',
+const PX2MM = 25.4 / 96
+const VIEWBOX_WIDTH = 361.15625
+const VIEWBOX_HEIGHT = 541.86667
+
+// The illustration and its masks are distributed by js-rich-body-highlighter.
+// Using its versioned CDN assets keeps the image crisp without inflating the app bundle.
+const BODY_IMAGES: Record<BodySide, string> = {
+  front: 'https://cdn.jsdelivr.net/npm/js-rich-body-highlighter@0.1.1/dist/bodies/male-front-dark.webp',
+  back: 'https://cdn.jsdelivr.net/npm/js-rich-body-highlighter@0.1.1/dist/bodies/male-back-dark.webp',
+}
+const richMusclesForSide = (side: BodySide) =>
+  (side === 'front' ? RICH_FRONT_MUSCLES : RICH_BACK_MUSCLES).filter((muscle) => muscle.gender === 'male')
+
+const appTargetsForRegion = (region: RichMuscleDefinition, side: BodySide): string[] => {
+  switch (region.group) {
+    case 'chest': return ['chest-upper', 'chest-lower']
+    case 'shoulders': return side === 'back' ? ['deltoid-posterior'] : ['deltoid-anterior', 'deltoid-lateral']
+    case 'biceps': return ['biceps-long', 'biceps-short', 'brachialis']
+    case 'triceps': return ['triceps-long', 'triceps-lateral', 'triceps-medial']
+    case 'forearms': return side === 'back' ? ['forearm-extensors'] : ['forearm-flexors']
+    case 'abs': return ['abs-upper', 'abs-lower']
+    case 'obliques': return ['obliques']
+    case 'upper_back': return ['upper-traps', 'mid-traps', 'lower-traps', 'rhomboids']
+    case 'lats': return ['lats']
+    case 'lower_back': return ['erectors']
+    case 'glutes': return ['glute-max', 'glute-med']
+    case 'quads': return ['quad-rectus', 'quad-lateral', 'quad-medial', 'quad-intermedius']
+    case 'hamstrings': return ['ham-biceps', 'ham-semitendinosus', 'ham-semimembranosus']
+    case 'calves': return ['calf-medial', 'calf-lateral', 'soleus']
+    default: return []
+  }
 }
 
-const regionsForSide = (side: BodySide): readonly MuscleDef[] =>
-  side === 'front' ? FRONT_MUSCLES : BACK_MUSCLES
-
-export const anatomyRegionCount = (side: BodySide) => regionsForSide(side).length
+const transformFor = (offset: RichMuscleDefinition['offset']) => {
+  if (!offset || (!offset.x && !offset.y)) return undefined
+  return `translate(${offset.x * PX2MM} ${offset.y * PX2MM})`
+}
 
 export function AnatomyBody({
   side,
   visibleMuscles,
   selectedMuscleId,
   onSelect,
+  mobileFooter,
 }: {
   side: BodySide
   visibleMuscles: Muscle[]
   selectedMuscleId: string
   onSelect: (muscle: Muscle) => void
+  mobileFooter?: ReactNode
 }) {
   const visibleIds = new Set(visibleMuscles.map((muscle) => muscle.id))
-  const regions = regionsForSide(side)
-  const viewBox = side === 'front' ? '0 0 35 93' : '37 0 35 93'
-
-  const selectRegion = (region: MuscleDef) => {
-    const mappedId = anatomyToMuscle[region.id]
-    if (!mappedId || !visibleIds.has(mappedId)) return
-    const muscle = muscleById.get(mappedId)
-    if (muscle) onSelect(muscle)
-  }
+  const regions = richMusclesForSide(side)
 
   return (
     <div className="body-stage">
       <div className="orientation">
         <span>{side === 'front' ? 'Anterior' : 'Posterior'}</span>
-        <small>{side === 'front' ? 'Front' : 'Back'} view</small>
+        <small>{side === 'front' ? 'Front' : 'Back'} · superficial view</small>
       </div>
 
       <div className="anatomy-figure">
-        <svg viewBox={viewBox} className="body-svg" role="img" aria-label={`${side} muscular anatomy map`}>
-          <defs>
-            <filter id="muscle-glow" x="-35%" y="-35%" width="170%" height="170%">
-              <feGaussianBlur stdDeviation="0.45" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-            <linearGradient id="muscle-tone" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#c65a4f" />
-              <stop offset="0.52" stopColor="#9b3f39" />
-              <stop offset="1" stopColor="#6f282a" />
-            </linearGradient>
-          </defs>
-
-          <g className="anatomy-shadow" aria-hidden="true">
-            {regions.map((region) => <path key={`shadow-${region.id}`} d={region.path} />)}
-          </g>
-
-          <g className="anatomy-regions">
+        <svg
+          viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+          className="body-svg"
+          role="img"
+          aria-label={`${side} superficial muscular anatomy map`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <image
+            href={BODY_IMAGES[side]}
+            x="0"
+            y="0"
+            width={VIEWBOX_WIDTH}
+            height={VIEWBOX_HEIGHT}
+            preserveAspectRatio="xMidYMid meet"
+            className="body-render"
+            aria-hidden="true"
+          />
+          <g className="rich-muscle-layer">
             {regions.map((region) => {
-              const mappedId = anatomyToMuscle[region.id]
-              const interactive = Boolean(mappedId && visibleIds.has(mappedId))
-              const selected = interactive && mappedId === selectedMuscleId
-              const mappedMuscle = mappedId ? muscleById.get(mappedId) : undefined
+              const candidates = appTargetsForRegion(region, side)
+              const activeTargets = candidates.filter((id) => visibleIds.has(id))
+              const selected = activeTargets.includes(selectedMuscleId)
+              const interactive = activeTargets.length > 0
+              const targetId = selectedMuscleId && activeTargets.includes(selectedMuscleId)
+                ? selectedMuscleId
+                : activeTargets[0]
+              const mappedMuscle = targetId ? muscleById.get(targetId) : undefined
               const label = mappedMuscle ? `${region.name}: ${mappedMuscle.name}` : region.name
 
               return (
                 <path
                   key={region.id}
-                  d={region.path}
-                  className={`anatomy-region${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}`}
+                  d={region.d}
+                  transform={transformFor(region.offset)}
+                  className={`rich-muscle${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}`}
                   tabIndex={interactive ? 0 : undefined}
                   role={interactive ? 'button' : undefined}
                   aria-label={interactive ? label : undefined}
                   aria-hidden={interactive ? undefined : true}
-                  onClick={interactive ? () => selectRegion(region) : undefined}
-                  onKeyDown={interactive ? (event) => {
+                  onClick={interactive && targetId ? () => {
+                    const muscle = muscleById.get(targetId)
+                    if (muscle) onSelect(muscle)
+                  } : undefined}
+                  onKeyDown={interactive && targetId ? (event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      selectRegion(region)
+                      const muscle = muscleById.get(targetId)
+                      if (muscle) onSelect(muscle)
                     }
                   } : undefined}
                 >
@@ -149,10 +126,11 @@ export function AnatomyBody({
       </div>
 
       <div className="anatomy-key" aria-hidden="true">
-        <span><i className="key-selected" />Selected</span>
-        <span><i className="key-muscle" />Muscle tissue</span>
+        <span><i className="key-selected" />Selected target</span>
+        <span><i className="key-muscle" />Muscle overlay</span>
       </div>
       <div className="diagram-hint"><span className="pulse-dot" /> Select a muscle region</div>
+      {mobileFooter}
     </div>
   )
 }

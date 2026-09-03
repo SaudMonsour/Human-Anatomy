@@ -27,7 +27,7 @@ export default function ProgressCharts({ data, unit }: { data: ChartPoint[]; uni
               <XAxis dataKey="date" stroke="#688078" tickLine={false} axisLine={false} fontSize={12} />
               <YAxis stroke="#688078" tickLine={false} axisLine={false} fontSize={12} width={52} unit={` ${unit}`} />
               <Tooltip content={<ChartTooltip unit={unit} />} />
-              <Line type="monotone" dataKey="weight" stroke="#c8ff3d" strokeWidth={3} dot={{ r: 4, fill: '#07110f', stroke: '#c8ff3d', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="weight" stroke="#c8ff3d" strokeWidth={3} dot={{ r: 4, fill: '#050505', stroke: '#c8ff3d', strokeWidth: 2 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

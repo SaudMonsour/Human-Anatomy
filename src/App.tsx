@@ -34,7 +34,7 @@ import {
   type Exercise,
   type Muscle,
 } from './data'
-import { AnatomyBody, anatomyRegionCount } from './AnatomyBody'
+import { AnatomyBody } from './AnatomyBody'
 
 const ProgressCharts = lazy(() => import('./ProgressCharts'))
 
@@ -123,6 +123,15 @@ function App() {
     setSelectedMuscleId(muscle.id)
   }
 
+  const changeSide = (nextSide: BodySide) => {
+    setSide(nextSide)
+    setSelectedMuscleId((currentId) => {
+      const current = muscleById.get(currentId)
+      if (current?.side === nextSide) return currentId
+      return muscles.find((muscle) => muscle.side === nextSide)?.id ?? currentId
+    })
+  }
+
   const openExercise = (item: Exercise) => setSelectedExercise(item)
 
   const saveLog = (entry: LogEntry) => {
@@ -176,7 +185,7 @@ function App() {
           {tab === 'explore' && (
             <ExploreScreen
               side={side}
-              setSide={setSide}
+              setSide={changeSide}
               selectedMuscleId={selectedMuscleId}
               openMuscle={openMuscle}
               openExercise={openExercise}
@@ -285,7 +294,8 @@ function ExploreScreen({
 }) {
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState('All')
-  const groups = ['All', ...Array.from(new Set(muscles.map((muscle) => muscle.group)))]
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
+  const groups = ['All', ...Array.from(new Set(muscles.filter((muscle) => muscle.side === side).map((muscle) => muscle.group)))]
   const selected = muscleById.get(selectedMuscleId) ?? muscles[0]
   const muscleExercises = exercisesForMuscle(selected.id)
 
@@ -305,6 +315,22 @@ function ExploreScreen({
 
   const visible = muscles.filter((muscle) => muscle.side === side && (group === 'All' || muscle.group === group))
 
+  const changeBodySide = (nextSide: BodySide) => {
+    const nextGroup = group === 'All' || muscles.some((muscle) => muscle.side === nextSide && muscle.group === group)
+      ? group
+      : 'All'
+    setGroup(nextGroup)
+    const nextMuscle = muscles.find((muscle) => muscle.side === nextSide && (nextGroup === 'All' || muscle.group === nextGroup))
+    if (nextMuscle) openMuscle(nextMuscle)
+    else setSide(nextSide)
+  }
+
+  const changeGroup = (nextGroup: string) => {
+    setGroup(nextGroup)
+    const nextMuscle = muscles.find((muscle) => muscle.side === side && (nextGroup === 'All' || muscle.group === nextGroup))
+    if (nextMuscle) openMuscle(nextMuscle)
+  }
+
   return (
     <div className="explore-layout">
       <section className="explorer-card">
@@ -321,7 +347,10 @@ function ExploreScreen({
             <div className="search-results">
               {results.length ? results.map((result) => (
                 <button key={`${result.kind}:${result.id}`} onClick={() => {
-                  if (result.kind === 'muscle') openMuscle(muscleById.get(result.id)!)
+                  if (result.kind === 'muscle') {
+                    setGroup('All')
+                    openMuscle(muscleById.get(result.id)!)
+                  }
                   else openExercise(exerciseById.get(result.id)!)
                   setQuery('')
                 }}>
@@ -336,14 +365,14 @@ function ExploreScreen({
 
         <div className="explorer-toolbar">
           <div className="segmented" aria-label="Body view">
-            <button className={side === 'front' ? 'selected' : ''} onClick={() => setSide('front')}>Front</button>
-            <button className={side === 'back' ? 'selected' : ''} onClick={() => setSide('back')}>Back</button>
+            <button className={side === 'front' ? 'selected' : ''} onClick={() => changeBodySide('front')}>Front</button>
+            <button className={side === 'back' ? 'selected' : ''} onClick={() => changeBodySide('back')}>Back</button>
           </div>
-          <div className="view-label"><Layers3 size={16} /> {anatomyRegionCount(side)} anatomical regions</div>
+          <div className="view-label"><Layers3 size={16} /> {visible.length} training targets</div>
         </div>
 
         <div className="group-filter" aria-label="Filter muscle groups">
-          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => setGroup(item)}>{item}</button>)}
+          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{item}</button>)}
         </div>
 
         <AnatomyBody
@@ -351,27 +380,97 @@ function ExploreScreen({
           visibleMuscles={visible}
           selectedMuscleId={selectedMuscleId}
           onSelect={openMuscle}
+          mobileFooter={(
+            <button
+              className="mobile-muscle-summary"
+              onClick={() => setMobileDetailsOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={mobileDetailsOpen}
+            >
+              <span className="mobile-summary-copy">
+                <small>{selected.group} · {selected.side}</small>
+                <strong>{selected.name}</strong>
+              </span>
+              <span className="mobile-summary-action">{muscleExercises.length} exercises <ChevronRight size={18} /></span>
+            </button>
+          )}
         />
       </section>
 
-      <aside className="muscle-panel">
-        <div className="panel-kicker"><span>{selected.group}</span><span>{selected.side} view</span></div>
-        <h2>{selected.name}</h2>
-        <p className="function-copy">{selected.function}</p>
-        <div className="panel-rule" />
-        <div className="section-heading"><span>Exercises</span><small>{muscleExercises.length} matched</small></div>
-        <div className="exercise-list">
-          {muscleExercises.map((item, index) => (
-            <button key={item.id} onClick={() => openExercise(item)}>
-              <span className="exercise-index">{String(index + 1).padStart(2, '0')}</span>
-              <span className="exercise-copy"><strong>{item.name}</strong><small>{item.equipment} · {item.level}</small></span>
-              <ChevronRight size={18} />
-            </button>
-          ))}
-        </div>
-        <div className="panel-tip"><Target size={17} /><span>Select another highlighted region to compare its role and exercise options.</span></div>
+      <aside className="muscle-panel desktop-muscle-panel">
+        <MuscleDetails selected={selected} openMuscle={openMuscle} openExercise={openExercise} />
       </aside>
+
+      {mobileDetailsOpen && (
+        <DialogFrame onClose={() => setMobileDetailsOpen(false)} className="muscle-drawer">
+          <div className="drawer-handle" aria-hidden="true" />
+          <div className="drawer-topline">
+            <span>Muscle details</span>
+            <button className="icon-button" onClick={() => setMobileDetailsOpen(false)} aria-label="Close muscle details"><X size={20} /></button>
+          </div>
+          <MuscleDetails
+            selected={selected}
+            openMuscle={openMuscle}
+            openExercise={(exercise) => {
+              setMobileDetailsOpen(false)
+              openExercise(exercise)
+            }}
+          />
+        </DialogFrame>
+      )}
     </div>
+  )
+}
+
+function MuscleDetails({
+  selected,
+  openMuscle,
+  openExercise,
+}: {
+  selected: Muscle
+  openMuscle: (muscle: Muscle) => void
+  openExercise: (exercise: Exercise) => void
+}) {
+  const muscleExercises = exercisesForMuscle(selected.id)
+  const relatedTargets = muscles.filter((muscle) => muscle.side === selected.side && muscle.group === selected.group)
+
+  return (
+    <>
+      <div className="panel-kicker"><span>{selected.group}</span><span>{selected.side} view</span></div>
+      <h2>{selected.name}</h2>
+      <p className="function-copy">{selected.function}</p>
+
+      {relatedTargets.length > 1 && (
+        <div className="target-switcher">
+          <span>Choose a specific target</span>
+          <div className="target-chip-row">
+            {relatedTargets.map((muscle) => (
+              <button
+                key={muscle.id}
+                className={muscle.id === selected.id ? 'selected' : ''}
+                aria-pressed={muscle.id === selected.id}
+                onClick={() => openMuscle(muscle)}
+              >
+                {muscle.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="panel-rule" />
+      <div className="section-heading"><span>Exercises</span><small>{muscleExercises.length} matched</small></div>
+      <div className="exercise-list">
+        {muscleExercises.map((item, index) => (
+          <button key={item.id} onClick={() => openExercise(item)}>
+            <span className="exercise-index">{String(index + 1).padStart(2, '0')}</span>
+            <span className="exercise-copy"><strong>{item.name}</strong><small>{item.equipment} · {item.level}</small></span>
+            <ChevronRight size={18} />
+          </button>
+        ))}
+      </div>
+      <div className="panel-tip"><Target size={17} /><span>Select another highlighted region to compare its role and exercise options.</span></div>
+    </>
   )
 }
 
