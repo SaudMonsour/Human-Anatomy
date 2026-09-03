@@ -30,6 +30,7 @@ import {
   muscleById,
   muscles,
   program,
+  targetsForFamily,
   type BodySide,
   type Exercise,
   type Muscle,
@@ -65,7 +66,7 @@ const navItems: { id: Tab; label: string; icon: LucideIcon }[] = [
 ]
 
 const tabCopy: Record<Tab, { eyebrow: string; title: string; description: string }> = {
-  explore: { eyebrow: 'Anatomy explorer', title: 'Train the right tissue', description: 'Select a region to understand its role and choose an exercise.' },
+  explore: { eyebrow: 'Anatomy explorer', title: 'Train the right tissue', description: 'Select a muscle, choose its exact head or part, then find the right exercise.' },
   program: { eyebrow: 'Four-day split', title: 'A balanced week', description: 'A practical upper–lower plan with explicit technique links.' },
   progress: { eyebrow: 'Performance', title: 'See what is improving', description: 'Compare working weight and volume exercise by exercise.' },
   history: { eyebrow: 'Training log', title: 'Your completed work', description: 'Review, search, or correct every recorded set.' },
@@ -74,6 +75,14 @@ const tabCopy: Record<Tab, { eyebrow: string; title: string; description: string
 const kgToLb = (kg: number) => kg * 2.20462
 const displayWeight = (kg: number, unit: Unit) => unit === 'kg' ? kg : kgToLb(kg)
 const round = (value: number, places = 1) => Number(value.toFixed(places))
+
+const targetTitle = (muscle: Muscle) => muscle.part.startsWith('Whole ') ? muscle.name : muscle.part
+const targetKindLabel = (muscle: Muscle) => ({
+  head: 'Head',
+  fibers: 'Fiber region',
+  region: 'Region',
+  muscle: 'Muscle',
+})[muscle.partKind]
 
 const localDateTimeValue = () => {
   const now = new Date()
@@ -297,15 +306,15 @@ function ExploreScreen({
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const groups = ['All', ...Array.from(new Set(muscles.filter((muscle) => muscle.side === side).map((muscle) => muscle.group)))]
   const selected = muscleById.get(selectedMuscleId) ?? muscles[0]
-  const muscleExercises = exercisesForMuscle(selected.id)
+  const familyTargets = targetsForFamily(selected.family)
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     if (!normalized) return []
     const muscleMatches = muscles
-      .filter((item) => `${item.name} ${item.group}`.toLowerCase().includes(normalized))
+      .filter((item) => `${item.name} ${item.group} ${item.family} ${item.part}`.toLowerCase().includes(normalized))
       .slice(0, 4)
-      .map((item) => ({ kind: 'muscle' as const, id: item.id, title: item.name, meta: item.group }))
+      .map((item) => ({ kind: 'muscle' as const, id: item.id, title: `${item.family} · ${targetTitle(item)}`, meta: `${item.group} · ${targetKindLabel(item)}` }))
     const exerciseMatches = exercises
       .filter((item) => `${item.name} ${item.equipment}`.toLowerCase().includes(normalized))
       .slice(0, 4)
@@ -375,6 +384,13 @@ function ExploreScreen({
           {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{item}</button>)}
         </div>
 
+        <ExactTargetPicker
+          selected={selected}
+          targets={familyTargets}
+          openMuscle={openMuscle}
+          variant="mobile-bar"
+        />
+
         <AnatomyBody
           side={side}
           visibleMuscles={visible}
@@ -388,10 +404,10 @@ function ExploreScreen({
               aria-expanded={mobileDetailsOpen}
             >
               <span className="mobile-summary-copy">
-                <small>{selected.group} · {selected.side}</small>
-                <strong>{selected.name}</strong>
+                <small>{selected.family} · {targetKindLabel(selected)}</small>
+                <strong>{targetTitle(selected)}</strong>
               </span>
-              <span className="mobile-summary-action">{muscleExercises.length} exercises <ChevronRight size={18} /></span>
+              <span className="mobile-summary-action">Exercises <ChevronRight size={18} /></span>
             </button>
           )}
         />
@@ -432,31 +448,17 @@ function MuscleDetails({
   openExercise: (exercise: Exercise) => void
 }) {
   const muscleExercises = exercisesForMuscle(selected.id)
-  const relatedTargets = muscles.filter((muscle) => muscle.side === selected.side && muscle.group === selected.group)
+  const relatedTargets = targetsForFamily(selected.family)
 
   return (
     <>
-      <div className="panel-kicker"><span>{selected.group}</span><span>{selected.side} view</span></div>
-      <h2>{selected.name}</h2>
+      <div className="panel-kicker"><span>{selected.family}</span><span>{targetKindLabel(selected)}</span></div>
+      <h2>{targetTitle(selected)}</h2>
+      {targetTitle(selected) !== selected.name && <p className="anatomical-name">{selected.name}</p>}
       <p className="function-copy">{selected.function}</p>
 
-      {relatedTargets.length > 1 && (
-        <div className="target-switcher">
-          <span>Choose a specific target</span>
-          <div className="target-chip-row">
-            {relatedTargets.map((muscle) => (
-              <button
-                key={muscle.id}
-                className={muscle.id === selected.id ? 'selected' : ''}
-                aria-pressed={muscle.id === selected.id}
-                onClick={() => openMuscle(muscle)}
-              >
-                {muscle.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <ExactTargetPicker selected={selected} targets={relatedTargets} openMuscle={openMuscle} variant="panel" />
+      <p className="targeting-note"><Info size={15} /> Exercises emphasize this target; they do not completely isolate it.</p>
 
       <div className="panel-rule" />
       <div className="section-heading"><span>Exercises</span><small>{muscleExercises.length} matched</small></div>
@@ -471,6 +473,47 @@ function MuscleDetails({
       </div>
       <div className="panel-tip"><Target size={17} /><span>Select another highlighted region to compare its role and exercise options.</span></div>
     </>
+  )
+}
+
+function ExactTargetPicker({
+  selected,
+  targets,
+  openMuscle,
+  variant,
+}: {
+  selected: Muscle
+  targets: Muscle[]
+  openMuscle: (muscle: Muscle) => void
+  variant: 'mobile-bar' | 'panel'
+}) {
+  return (
+    <section className={`exact-target-picker ${variant}`} aria-label={`Choose a specific target within ${selected.family}`}>
+      <div className="exact-target-heading">
+        <span><Target size={15} /> Exact target</span>
+        <strong>{selected.family}</strong>
+      </div>
+      <div className="exact-target-options">
+        {targets.map((muscle) => {
+          const active = muscle.id === selected.id
+          const count = exercisesForMuscle(muscle.id).length
+          return (
+            <button
+              key={muscle.id}
+              className={active ? 'selected' : ''}
+              aria-pressed={active}
+              onClick={() => openMuscle(muscle)}
+            >
+              <span className="target-choice-copy">
+                <small>{targetKindLabel(muscle)}</small>
+                <strong>{targetTitle(muscle)}</strong>
+              </span>
+              <span className="target-exercise-count">{count}</span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -715,7 +758,7 @@ function ExerciseDialog({ exercise, onClose, onLog }: { exercise: Exercise; onCl
         <div className="exercise-symbol"><Dumbbell size={34} /></div>
         <div><div className="eyebrow">{muscle.group} · {exercise.level}</div><h2>{exercise.name}</h2><p>{exercise.equipment}</p></div>
       </div>
-      <div className="target-card"><Target size={19} /><div><small>Primary target</small><strong>{muscle.name}</strong></div><p>{muscle.function}</p></div>
+      <div className="target-card"><Target size={19} /><div><small>Primary target</small><strong>{muscle.family} · {targetTitle(muscle)}</strong></div><p>{muscle.function}</p></div>
       <div className="guide-grid">
         <div>
           <div className="section-heading"><span>How to perform it</span></div>

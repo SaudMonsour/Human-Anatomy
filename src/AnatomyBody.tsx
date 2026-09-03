@@ -93,7 +93,9 @@ export function AnatomyBody({
                 ? selectedMuscleId
                 : activeTargets[0]
               const mappedMuscle = targetId ? muscleById.get(targetId) : undefined
-              const label = mappedMuscle ? `${region.name}: ${mappedMuscle.name}` : region.name
+              const label = mappedMuscle
+                ? `${region.name}: ${activeTargets.length} exact ${activeTargets.length === 1 ? 'target' : 'targets'}, currently ${mappedMuscle.part}`
+                : region.name
 
               return (
                 <path

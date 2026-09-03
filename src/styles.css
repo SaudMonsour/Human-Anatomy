@@ -85,6 +85,23 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
 .group-filter::-webkit-scrollbar { display: none; }
 .group-filter button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-soft); border-radius: 999px; background: transparent; color: var(--muted-2); font-size: .78rem; font-weight: 700; }
 .group-filter button.selected { color: #101a08; border-color: var(--lime); background: var(--lime); }
+.exact-target-picker.mobile-bar { display: none; }
+.exact-target-picker.panel { margin-top: 20px; }
+.exact-target-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.exact-target-heading > span { display: flex; align-items: center; gap: 6px; color: var(--mint); font-size: .75rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.exact-target-heading > span svg { color: var(--lime); }
+.exact-target-heading > strong { overflow: hidden; color: var(--muted); font-size: .78rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.exact-target-options { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.exact-target-options button { width: 100%; min-height: 64px; padding: 9px 10px 9px 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--panel-2); color: var(--muted); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; text-align: left; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.exact-target-options button:hover { border-color: rgba(200, 255, 61, .42); transform: translateY(-1px); }
+.exact-target-options button.selected { border-color: var(--lime); background: rgba(200, 255, 61, .11); color: var(--text); box-shadow: inset 0 0 0 1px rgba(200, 255, 61, .08); }
+.target-choice-copy { min-width: 0; }
+.target-choice-copy small, .target-choice-copy strong { display: block; }
+.target-choice-copy small { color: var(--muted-2); font-size: .75rem; font-weight: 750; text-transform: uppercase; }
+.target-choice-copy strong { margin-top: 4px; overflow: hidden; color: inherit; font-size: .82rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.exact-target-options button.selected .target-choice-copy small { color: var(--lime); }
+.target-exercise-count { min-width: 25px; height: 25px; padding: 0 6px; border-radius: 8px; background: rgba(255, 255, 255, .07); color: var(--muted); display: grid; place-items: center; font-size: .75rem; font-style: normal; font-weight: 850; }
+.exact-target-options button.selected .target-exercise-count { background: var(--lime); color: #101a08; }
 .mobile-muscle-summary { display: none; }
 
 .body-stage { min-height: 680px; margin-top: 10px; border-radius: 17px; border: 1px solid var(--line-soft); overflow: hidden; position: relative; display: grid; place-items: center; isolation: isolate; background-color: #000; background-image: linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px), radial-gradient(circle at 50% 38%, rgba(224, 56, 48, .13), transparent 35%), radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .05), transparent 62%); background-size: 32px 32px, 32px 32px, auto, auto; }
@@ -113,6 +130,9 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
 .panel-kicker span:last-child { color: var(--muted-2); }
 .muscle-panel h2, .muscle-drawer h2 { margin-top: 16px; font-size: clamp(1.7rem, 2.6vw, 2.35rem); letter-spacing: -.045em; line-height: 1.05; }
 .function-copy { margin-top: 12px; color: var(--muted); font-size: .92rem; line-height: 1.62; }
+.anatomical-name { margin-top: 7px; color: var(--mint); font-size: .8rem; font-weight: 700; }
+.targeting-note { margin-top: 11px; display: flex; align-items: flex-start; gap: 7px; color: var(--muted-2); font-size: .75rem; line-height: 1.45; }
+.targeting-note svg { flex: none; margin-top: 1px; color: var(--mint); }
 .panel-rule { height: 1px; margin: 22px 0; background: var(--line-soft); }
 .section-heading { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-heading > span { color: var(--text); font-size: .78rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
@@ -305,6 +325,12 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
   .mobile-nav span { font-size: .75rem; }
   .explore-layout { grid-template-columns: 1fr; }
   .desktop-muscle-panel { display: none; }
+  .exact-target-picker.mobile-bar { margin: 9px 0 8px; padding: 10px; border: 1px solid var(--line-soft); border-radius: 15px; background: rgba(13, 13, 13, .88); display: block; }
+  .exact-target-picker.mobile-bar .exact-target-heading > span { font-size: .75rem; }
+  .exact-target-picker.mobile-bar .exact-target-heading > strong { max-width: 58%; font-size: .8rem; }
+  .exact-target-picker.mobile-bar .exact-target-options { display: flex; overflow-x: auto; padding: 1px 1px 3px; scrollbar-width: none; }
+  .exact-target-picker.mobile-bar .exact-target-options::-webkit-scrollbar { display: none; }
+  .exact-target-picker.mobile-bar .exact-target-options button { flex: 0 0 auto; width: auto; min-width: 132px; min-height: 58px; }
   .body-stage { height: clamp(480px, 64svh, 620px); min-height: 480px; }
   .mobile-muscle-summary { position: absolute; z-index: 4; left: 12px; right: 12px; bottom: 12px; min-height: 70px; padding: 10px 11px 10px 14px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 16px; background: rgba(10, 10, 10, .9); box-shadow: 0 16px 36px rgba(0, 0, 0, .55); backdrop-filter: blur(18px); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; text-align: left; }
   .mobile-summary-copy { min-width: 0; }
@@ -319,9 +345,10 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
   .drawer-topline { font-size: .875rem; }
   .muscle-drawer h2 { margin-top: 13px; font-size: 1.8rem; }
   .muscle-drawer .function-copy { font-size: 1rem; line-height: 1.55; }
-  .muscle-drawer .target-switcher > span { font-size: .875rem; }
   .muscle-drawer .panel-tip { display: none; }
   .muscle-drawer .exercise-list button { min-height: 72px; }
+  .muscle-drawer .exact-target-options button { min-height: 68px; }
+  .muscle-drawer .targeting-note { font-size: .8rem; }
   .target-chip-row button { min-height: 44px; padding-inline: 14px; font-size: .875rem; }
   .program-grid { grid-template-columns: 1fr; }
   .guide-grid { grid-template-columns: 1fr; }
@@ -344,6 +371,8 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
   .view-label svg { width: 15px; }
   .group-filter { margin-top: 9px; gap: 6px; }
   .group-filter button { min-height: 40px; padding-inline: 14px; font-size: .82rem; }
+  .exact-target-picker.mobile-bar { margin-top: 7px; padding: 9px; }
+  .exact-target-picker.mobile-bar .exact-target-options button { min-width: 126px; }
   .body-stage { height: clamp(480px, 64svh, 560px); min-height: 480px; margin-top: 7px; }
   .anatomy-figure { width: min(100%, 390px); height: 100%; padding: 28px 8px 82px; }
   .body-svg { width: 100%; height: 100%; }
@@ -391,7 +420,7 @@ button { border: 0; cursor: pointer; touch-action: manipulation; }
 @media (hover: none) and (pointer: coarse) {
   .rich-muscle.interactive { fill-opacity: .25; stroke-opacity: .3; }
   .rich-muscle.interactive:active { fill: #ff6b5e; fill-opacity: .58; stroke-opacity: .8; }
-  .mobile-muscle-summary:active, .mobile-nav button:active, .group-filter button:active, .target-chip-row button:active { transform: scale(.985); }
+  .mobile-muscle-summary:active, .mobile-nav button:active, .group-filter button:active, .target-chip-row button:active, .exact-target-options button:active { transform: scale(.985); }
 }
 
 @media (prefers-reduced-motion: reduce) {
