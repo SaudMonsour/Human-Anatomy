@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { translate, type Language } from './i18n'
 
 type ChartPoint = { date: string; weight: number; volume: number }
 
@@ -15,11 +16,11 @@ function ChartTooltip({ active, payload, label, unit }: { active?: boolean; payl
   return <div className="chart-tooltip"><span>{label}</span><strong>{payload[0].value?.toLocaleString()} {unit}</strong></div>
 }
 
-export default function ProgressCharts({ data, unit }: { data: ChartPoint[]; unit: 'kg' | 'lb' }) {
+export default function ProgressCharts({ data, unit, language }: { data: ChartPoint[]; unit: 'kg' | 'lb'; language: Language }) {
   return (
     <>
       <section className="chart-card large">
-        <div className="chart-heading"><div><div className="eyebrow">Working weight</div><h2>Top load by day</h2></div><span>{data.length} training days</span></div>
+        <div className="chart-heading"><div><div className="eyebrow">{translate(language, 'chart.weightEyebrow')}</div><h2>{translate(language, 'chart.weightTitle')}</h2></div><span>{translate(language, 'chart.days', { count: data.length })}</span></div>
         <div className="chart-wrap">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 12, right: 12, left: -14, bottom: 0 }}>
@@ -34,7 +35,7 @@ export default function ProgressCharts({ data, unit }: { data: ChartPoint[]; uni
       </section>
 
       <section className="chart-card">
-        <div className="chart-heading"><div><div className="eyebrow">Training volume</div><h2>Work performed by day</h2></div><span>weight × reps × sets</span></div>
+        <div className="chart-heading"><div><div className="eyebrow">{translate(language, 'chart.volumeEyebrow')}</div><h2>{translate(language, 'chart.volumeTitle')}</h2></div><span>{translate(language, 'chart.formula')}</span></div>
         <div className="chart-wrap compact">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>

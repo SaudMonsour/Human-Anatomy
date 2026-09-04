@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { createContext, FormEvent, lazy, Suspense, useContext, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   Home,
   Info,
   Layers3,
+  Languages,
   Search,
   ShieldAlert,
   Target,
@@ -36,11 +37,35 @@ import {
   type Muscle,
 } from './data'
 import { AnatomyBody } from './AnatomyBody'
+import {
+  localizeExercise,
+  localizeLevel,
+  localizeMuscle,
+  localizeProgram,
+  localizeRest,
+  translate,
+  type Language,
+  type TranslationKey,
+} from './i18n'
 
 const ProgressCharts = lazy(() => import('./ProgressCharts'))
 
 type Tab = 'explore' | 'program' | 'progress' | 'history'
 type Unit = 'kg' | 'lb'
+
+type LanguageContextValue = {
+  language: Language
+  setLanguage: (language: Language) => void
+  t: (key: TranslationKey, values?: Record<string, string | number>) => string
+}
+
+const LanguageContext = createContext<LanguageContextValue | null>(null)
+
+function useLanguage() {
+  const value = useContext(LanguageContext)
+  if (!value) throw new Error('Language context is unavailable')
+  return value
+}
 
 type LogEntry = {
   id: string
@@ -58,31 +83,24 @@ type ToastState = {
   onAction?: () => void
 }
 
-const navItems: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'explore', label: 'Explore', icon: Home },
-  { id: 'program', label: 'Program', icon: CalendarDays },
-  { id: 'progress', label: 'Progress', icon: BarChart3 },
-  { id: 'history', label: 'History', icon: History },
+const navItems: { id: Tab; icon: LucideIcon }[] = [
+  { id: 'explore', icon: Home },
+  { id: 'program', icon: CalendarDays },
+  { id: 'progress', icon: BarChart3 },
+  { id: 'history', icon: History },
 ]
-
-const tabCopy: Record<Tab, { eyebrow: string; title: string; description: string }> = {
-  explore: { eyebrow: 'Anatomy explorer', title: 'Train the right tissue', description: 'Select a muscle, choose its exact head or part, then find the right exercise.' },
-  program: { eyebrow: 'Four-day split', title: 'A balanced week', description: 'A practical upper–lower plan with explicit technique links.' },
-  progress: { eyebrow: 'Performance', title: 'See what is improving', description: 'Compare working weight and volume exercise by exercise.' },
-  history: { eyebrow: 'Training log', title: 'Your completed work', description: 'Review, search, or correct every recorded set.' },
-}
 
 const kgToLb = (kg: number) => kg * 2.20462
 const displayWeight = (kg: number, unit: Unit) => unit === 'kg' ? kg : kgToLb(kg)
 const round = (value: number, places = 1) => Number(value.toFixed(places))
 
 const targetTitle = (muscle: Muscle) => muscle.part.startsWith('Whole ') ? muscle.name : muscle.part
-const targetKindLabel = (muscle: Muscle) => ({
-  head: 'Head',
-  fibers: 'Fiber region',
-  region: 'Region',
-  muscle: 'Muscle',
-})[muscle.partKind]
+const targetKindLabel = (muscle: Muscle, language: Language) => translate(language, ({
+  head: 'target.head',
+  fibers: 'target.fibers',
+  region: 'target.region',
+  muscle: 'target.muscle',
+})[muscle.partKind] as TranslationKey)
 
 const localDateTimeValue = () => {
   const now = new Date()
@@ -107,6 +125,7 @@ function readStorage<T>(key: string, fallback: T): T {
 }
 
 function App() {
+  const [language, setLanguage] = useState<Language>(() => readStorage('musclemap:language', 'en'))
   const [tab, setTab] = useState<Tab>('explore')
   const [side, setSide] = useState<BodySide>('front')
   const [selectedMuscleId, setSelectedMuscleId] = useState('chest-upper')
@@ -117,7 +136,9 @@ function App() {
   const [unit, setUnit] = useState<Unit>(() => readStorage('musclemap:unit', 'kg'))
   const [confirmReset, setConfirmReset] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values)
 
+  useEffect(() => localStorage.setItem('musclemap:language', JSON.stringify(language)), [language])
   useEffect(() => localStorage.setItem('musclemap:logs:v2', JSON.stringify(logs)), [logs])
   useEffect(() => localStorage.setItem('musclemap:program:v2', JSON.stringify(completed)), [completed])
   useEffect(() => localStorage.setItem('musclemap:unit', JSON.stringify(unit)), [unit])
@@ -126,6 +147,10 @@ function App() {
     const timer = window.setTimeout(() => setToast(null), 4500)
     return () => window.clearTimeout(timer)
   }, [toast])
+  useEffect(() => {
+    document.documentElement.lang = language
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'
+  }, [language])
 
   const openMuscle = (muscle: Muscle) => {
     setSide(muscle.side)
@@ -146,7 +171,8 @@ function App() {
   const saveLog = (entry: LogEntry) => {
     setLogs((current) => [...current, entry])
     setLogExercise(null)
-    setToast({ message: `${exerciseById.get(entry.exerciseId)?.name ?? 'Exercise'} saved` })
+    const exercise = exerciseById.get(entry.exerciseId)
+    setToast({ message: t('toast.saved', { exercise: exercise ? localizeExercise(exercise, language).name : t('exercise.fallback') }) })
   }
 
   const deleteLog = (id: string) => {
@@ -154,8 +180,8 @@ function App() {
     if (!removed) return
     setLogs((current) => current.filter((entry) => entry.id !== id))
     setToast({
-      message: 'Log entry removed',
-      actionLabel: 'Undo',
+      message: t('toast.removed'),
+      actionLabel: t('toast.undo'),
       onAction: () => {
         setLogs((current) => [...current, removed])
         setToast(null)
@@ -172,13 +198,18 @@ function App() {
     setLogs([])
     setCompleted([])
     setConfirmReset(false)
-    setToast({ message: 'Training data cleared' })
+    setToast({ message: t('toast.cleared') })
   }
 
-  const copy = tabCopy[tab]
+  const copy = {
+    eyebrow: t(`tab.${tab}.eyebrow` as TranslationKey),
+    title: t(`tab.${tab}.title` as TranslationKey),
+    description: t(`tab.${tab}.description` as TranslationKey),
+  }
 
   return (
-    <div className="app-shell">
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <div className="app-shell" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <Sidebar tab={tab} setTab={setTab} />
       <div className="app-main">
         <header className="topbar">
@@ -187,7 +218,12 @@ function App() {
             <h1>{copy.title}</h1>
             <p>{copy.description}</p>
           </div>
-          <div className="brand-mark" aria-label="MuscleMap"><Activity size={22} /><span>MM</span></div>
+          <div className="topbar-actions">
+            <button className="language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={t('language.switch')}>
+              <Languages size={18} /><span>{t('language.next')}</span>
+            </button>
+            <div className="brand-mark" aria-label="MuscleMap"><Activity size={22} /><span>MM</span></div>
+          </div>
         </header>
 
         <main className="page-content">
@@ -257,31 +293,34 @@ function App() {
         </div>
       )}
     </div>
+    </LanguageContext.Provider>
   )
 }
 
 function Sidebar({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
+  const { t } = useLanguage()
   return (
     <aside className="sidebar">
       <div className="wordmark"><span><Activity size={20} /></span><strong>MuscleMap</strong></div>
-      <nav aria-label="Main navigation">
-        {navItems.map(({ id, label, icon: Icon }) => (
+      <nav aria-label={t('nav.label')}>
+        {navItems.map(({ id, icon: Icon }) => (
           <button key={id} className={tab === id ? 'nav-item active' : 'nav-item'} onClick={() => setTab(id)}>
-            <Icon size={19} /><span>{label}</span>
+            <Icon size={19} /><span>{t(`nav.${id}` as TranslationKey)}</span>
           </button>
         ))}
       </nav>
-      <div className="sidebar-note"><Info size={16} /><p>Training guidance, not medical diagnosis. Stop if an exercise causes pain.</p></div>
+      <div className="sidebar-note"><Info size={16} /><p>{t('safety.note')}</p></div>
     </aside>
   )
 }
 
 function MobileNav({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
+  const { t } = useLanguage()
   return (
-    <nav className="mobile-nav" aria-label="Main navigation">
-      {navItems.map(({ id, label, icon: Icon }) => (
+    <nav className="mobile-nav" aria-label={t('nav.label')}>
+      {navItems.map(({ id, icon: Icon }) => (
         <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-          <Icon size={20} /><span>{label}</span>
+          <Icon size={20} /><span>{t(`nav.${id}` as TranslationKey)}</span>
         </button>
       ))}
     </nav>
@@ -301,26 +340,45 @@ function ExploreScreen({
   openMuscle: (muscle: Muscle) => void
   openExercise: (exercise: Exercise) => void
 }) {
+  const { language, t } = useLanguage()
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState('All')
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const groups = ['All', ...Array.from(new Set(muscles.filter((muscle) => muscle.side === side).map((muscle) => muscle.group)))]
   const selected = muscleById.get(selectedMuscleId) ?? muscles[0]
+  const selectedText = localizeMuscle(selected, language)
   const familyTargets = targetsForFamily(selected.family)
+  const groupLabel = (item: string) => {
+    if (item === 'All') return t('filter.all')
+    const representative = muscles.find((muscle) => muscle.group === item)
+    return representative ? localizeMuscle(representative, language).group : item
+  }
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     if (!normalized) return []
     const muscleMatches = muscles
-      .filter((item) => `${item.name} ${item.group} ${item.family} ${item.part}`.toLowerCase().includes(normalized))
+      .filter((item) => {
+        const localized = localizeMuscle(item, language)
+        return `${item.name} ${item.group} ${item.family} ${item.part} ${localized.name} ${localized.group} ${localized.family} ${localized.part}`.toLowerCase().includes(normalized)
+      })
       .slice(0, 4)
-      .map((item) => ({ kind: 'muscle' as const, id: item.id, title: `${item.family} · ${targetTitle(item)}`, meta: `${item.group} · ${targetKindLabel(item)}` }))
+      .map((item) => {
+        const localized = localizeMuscle(item, language)
+        return { kind: 'muscle' as const, id: item.id, title: `${localized.family} · ${targetTitle(localized)}`, meta: `${localized.group} · ${targetKindLabel(localized, language)}` }
+      })
     const exerciseMatches = exercises
-      .filter((item) => `${item.name} ${item.equipment}`.toLowerCase().includes(normalized))
+      .filter((item) => {
+        const localized = localizeExercise(item, language)
+        return `${item.name} ${item.equipment} ${localized.name} ${localized.equipment}`.toLowerCase().includes(normalized)
+      })
       .slice(0, 4)
-      .map((item) => ({ kind: 'exercise' as const, id: item.id, title: item.name, meta: item.equipment }))
+      .map((item) => {
+        const localized = localizeExercise(item, language)
+        return { kind: 'exercise' as const, id: item.id, title: localized.name, meta: localized.equipment }
+      })
     return [...muscleMatches, ...exerciseMatches].slice(0, 6)
-  }, [query])
+  }, [query, language])
 
   const visible = muscles.filter((muscle) => muscle.side === side && (group === 'All' || muscle.group === group))
 
@@ -348,10 +406,10 @@ function ExploreScreen({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search a muscle or exercise"
-            aria-label="Search muscles and exercises"
+            placeholder={t('search.placeholder')}
+            aria-label={t('search.label')}
           />
-          {query && <button className="clear-search" onClick={() => setQuery('')} aria-label="Clear search"><X size={17} /></button>}
+          {query && <button className="clear-search" onClick={() => setQuery('')} aria-label={t('search.clear')}><X size={17} /></button>}
           {query && (
             <div className="search-results">
               {results.length ? results.map((result) => (
@@ -367,21 +425,21 @@ function ExploreScreen({
                   <span><strong>{result.title}</strong><small>{result.meta}</small></span>
                   <ChevronRight size={17} />
                 </button>
-              )) : <div className="no-results">No matching muscles or exercises.</div>}
+              )) : <div className="no-results">{t('search.empty')}</div>}
             </div>
           )}
         </div>
 
         <div className="explorer-toolbar">
-          <div className="segmented" aria-label="Body view">
-            <button className={side === 'front' ? 'selected' : ''} onClick={() => changeBodySide('front')}>Front</button>
-            <button className={side === 'back' ? 'selected' : ''} onClick={() => changeBodySide('back')}>Back</button>
+          <div className="segmented" aria-label={t('body.view')}>
+            <button className={side === 'front' ? 'selected' : ''} onClick={() => changeBodySide('front')}>{t('body.front')}</button>
+            <button className={side === 'back' ? 'selected' : ''} onClick={() => changeBodySide('back')}>{t('body.back')}</button>
           </div>
-          <div className="view-label"><Layers3 size={16} /> {visible.length} training targets</div>
+          <div className="view-label"><Layers3 size={16} /> {t('body.targetCount', { count: visible.length })}</div>
         </div>
 
-        <div className="group-filter" aria-label="Filter muscle groups">
-          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{item}</button>)}
+        <div className="group-filter" aria-label={t('filter.label')}>
+          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{groupLabel(item)}</button>)}
         </div>
 
         <ExactTargetPicker
@@ -396,6 +454,7 @@ function ExploreScreen({
           visibleMuscles={visible}
           selectedMuscleId={selectedMuscleId}
           onSelect={openMuscle}
+          language={language}
           mobileFooter={(
             <button
               className="mobile-muscle-summary"
@@ -404,10 +463,10 @@ function ExploreScreen({
               aria-expanded={mobileDetailsOpen}
             >
               <span className="mobile-summary-copy">
-                <small>{selected.family} · {targetKindLabel(selected)}</small>
-                <strong>{targetTitle(selected)}</strong>
+                <small>{selectedText.family} · {targetKindLabel(selectedText, language)}</small>
+                <strong>{targetTitle(selectedText)}</strong>
               </span>
-              <span className="mobile-summary-action">Exercises <ChevronRight size={18} /></span>
+              <span className="mobile-summary-action">{t('details.exercises')} <ChevronRight size={18} /></span>
             </button>
           )}
         />
@@ -421,8 +480,8 @@ function ExploreScreen({
         <DialogFrame onClose={() => setMobileDetailsOpen(false)} className="muscle-drawer">
           <div className="drawer-handle" aria-hidden="true" />
           <div className="drawer-topline">
-            <span>Muscle details</span>
-            <button className="icon-button" onClick={() => setMobileDetailsOpen(false)} aria-label="Close muscle details"><X size={20} /></button>
+            <span>{t('details.title')}</span>
+            <button className="icon-button" onClick={() => setMobileDetailsOpen(false)} aria-label={t('details.close')}><X size={20} /></button>
           </div>
           <MuscleDetails
             selected={selected}
@@ -447,31 +506,36 @@ function MuscleDetails({
   openMuscle: (muscle: Muscle) => void
   openExercise: (exercise: Exercise) => void
 }) {
+  const { language, t } = useLanguage()
+  const selectedText = localizeMuscle(selected, language)
   const muscleExercises = exercisesForMuscle(selected.id)
   const relatedTargets = targetsForFamily(selected.family)
 
   return (
     <>
-      <div className="panel-kicker"><span>{selected.family}</span><span>{targetKindLabel(selected)}</span></div>
-      <h2>{targetTitle(selected)}</h2>
-      {targetTitle(selected) !== selected.name && <p className="anatomical-name">{selected.name}</p>}
-      <p className="function-copy">{selected.function}</p>
+      <div className="panel-kicker"><span>{selectedText.family}</span><span>{targetKindLabel(selectedText, language)}</span></div>
+      <h2>{targetTitle(selectedText)}</h2>
+      {targetTitle(selectedText) !== selectedText.name && <p className="anatomical-name">{selectedText.name}</p>}
+      <p className="function-copy">{selectedText.function}</p>
 
       <ExactTargetPicker selected={selected} targets={relatedTargets} openMuscle={openMuscle} variant="panel" />
-      <p className="targeting-note"><Info size={15} /> Exercises emphasize this target; they do not completely isolate it.</p>
+      <p className="targeting-note"><Info size={15} /> {t('target.note')}</p>
 
       <div className="panel-rule" />
-      <div className="section-heading"><span>Exercises</span><small>{muscleExercises.length} matched</small></div>
+      <div className="section-heading"><span>{t('details.exercises')}</span><small>{t('details.matched', { count: muscleExercises.length })}</small></div>
       <div className="exercise-list">
-        {muscleExercises.map((item, index) => (
-          <button key={item.id} onClick={() => openExercise(item)}>
-            <span className="exercise-index">{String(index + 1).padStart(2, '0')}</span>
-            <span className="exercise-copy"><strong>{item.name}</strong><small>{item.equipment} · {item.level}</small></span>
-            <ChevronRight size={18} />
-          </button>
-        ))}
+        {muscleExercises.map((item, index) => {
+          const localized = localizeExercise(item, language)
+          return (
+            <button key={item.id} onClick={() => openExercise(item)}>
+              <span className="exercise-index">{String(index + 1).padStart(2, '0')}</span>
+              <span className="exercise-copy"><strong>{localized.name}</strong><small>{localized.equipment} · {localizeLevel(item.level, language)}</small></span>
+              <ChevronRight size={18} />
+            </button>
+          )
+        })}
       </div>
-      <div className="panel-tip"><Target size={17} /><span>Select another highlighted region to compare its role and exercise options.</span></div>
+      <div className="panel-tip"><Target size={17} /><span>{t('details.compare')}</span></div>
     </>
   )
 }
@@ -487,16 +551,19 @@ function ExactTargetPicker({
   openMuscle: (muscle: Muscle) => void
   variant: 'mobile-bar' | 'panel'
 }) {
+  const { language, t } = useLanguage()
+  const selectedText = localizeMuscle(selected, language)
   return (
-    <section className={`exact-target-picker ${variant}`} aria-label={`Choose a specific target within ${selected.family}`}>
+    <section className={`exact-target-picker ${variant}`} aria-label={t('target.choose', { family: selectedText.family })}>
       <div className="exact-target-heading">
-        <span><Target size={15} /> Exact target</span>
-        <strong>{selected.family}</strong>
+        <span><Target size={15} /> {t('target.exact')}</span>
+        <strong>{selectedText.family}</strong>
       </div>
       <div className="exact-target-options">
         {targets.map((muscle) => {
           const active = muscle.id === selected.id
           const count = exercisesForMuscle(muscle.id).length
+          const localized = localizeMuscle(muscle, language)
           return (
             <button
               key={muscle.id}
@@ -505,8 +572,8 @@ function ExactTargetPicker({
               onClick={() => openMuscle(muscle)}
             >
               <span className="target-choice-copy">
-                <small>{targetKindLabel(muscle)}</small>
-                <strong>{targetTitle(muscle)}</strong>
+                <small>{targetKindLabel(localized, language)}</small>
+                <strong>{targetTitle(localized)}</strong>
               </span>
               <span className="target-exercise-count">{count}</span>
             </button>
@@ -526,6 +593,7 @@ function ProgramScreen({
   toggleItem: (id: string) => void
   openExercise: (exercise: Exercise) => void
 }) {
+  const { language, t } = useLanguage()
   const allItems = program.flatMap((day) => day.items)
   const currentWeek = weekKey()
   const completedCount = allItems.filter((item) => completed.includes(`${currentWeek}:${item.id}`)).length
@@ -535,36 +603,38 @@ function ProgramScreen({
     <div className="program-layout">
       <section className="week-overview">
         <div className="week-ring" style={{ '--progress': `${percent * 3.6}deg` } as React.CSSProperties}>
-          <div><strong>{percent}%</strong><span>this week</span></div>
+          <div><strong>{percent}%</strong><span>{t('program.thisWeek')}</span></div>
         </div>
         <div>
-          <div className="eyebrow">Weekly completion</div>
-          <h2>{completedCount} of {allItems.length} exercises</h2>
-          <p>Aim for steady, repeatable sessions. Leave at least one rest day between lower-body workouts.</p>
+          <div className="eyebrow">{t('program.completion')}</div>
+          <h2>{t('program.count', { done: completedCount, total: allItems.length })}</h2>
+          <p>{t('program.advice')}</p>
         </div>
       </section>
 
       <div className="program-grid">
         {program.map((day) => {
+          const localizedDay = localizeProgram(day, language)
           const dayDone = day.items.filter((item) => completed.includes(`${currentWeek}:${item.id}`)).length
           return (
             <section className="program-card" key={day.id}>
               <div className="program-card-head">
-                <div className="day-badge">{day.label.replace('Day ', '')}</div>
-                <div><div className="eyebrow">{day.label}</div><h2>{day.title}</h2><p>{day.focus}</p></div>
-                <div className="day-meta"><Clock3 size={15} /> {day.duration}<span>{dayDone}/{day.items.length}</span></div>
+                <div className="day-badge">{localizedDay.label.replace(language === 'ar' ? 'اليوم ' : 'Day ', '')}</div>
+                <div><div className="eyebrow">{localizedDay.label}</div><h2>{localizedDay.title}</h2><p>{localizedDay.focus}</p></div>
+                <div className="day-meta"><Clock3 size={15} /> {localizedDay.duration}<span>{dayDone}/{day.items.length}</span></div>
               </div>
               <div className="program-items">
                 {day.items.map((item) => {
                   const movement = exerciseById.get(item.exerciseId)!
+                  const localizedMovement = localizeExercise(movement, language)
                   const isDone = completed.includes(`${currentWeek}:${item.id}`)
                   return (
                     <div className={isDone ? 'program-item done' : 'program-item'} key={item.id}>
-                      <button className="check-button" onClick={() => toggleItem(item.id)} aria-label={`${isDone ? 'Mark incomplete' : 'Mark complete'}: ${movement.name}`}>
+                      <button className="check-button" onClick={() => toggleItem(item.id)} aria-label={`${isDone ? t('program.incomplete') : t('program.complete')}: ${localizedMovement.name}`}>
                         {isDone ? <Check size={16} /> : <Circle size={16} />}
                       </button>
                       <button className="program-link" onClick={() => openExercise(movement)}>
-                        <span><strong>{movement.name}</strong><small>{item.prescription} · {item.rest} rest</small></span>
+                        <span><strong>{localizedMovement.name}</strong><small>{item.prescription} · {localizeRest(item.rest, language)} {t('program.rest')}</small></span>
                         <ChevronRight size={18} />
                       </button>
                     </div>
@@ -590,6 +660,8 @@ function ProgressScreen({
   setUnit: (unit: Unit) => void
   onExplore: () => void
 }) {
+  const { language, t } = useLanguage()
+  const locale = language === 'ar' ? 'ar-SA' : 'en-US'
   const exerciseIds = Array.from(new Set(logs.map((log) => log.exerciseId)))
   const [selectedId, setSelectedId] = useState(exerciseIds[0] ?? '')
 
@@ -605,17 +677,17 @@ function ProgressScreen({
     const byDay = new Map<string, { date: string; weight: number; volume: number }>()
     selectedLogs.forEach((entry) => {
       const key = entry.date.slice(0, 10)
-      const label = new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      const label = new Date(entry.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
       const current = byDay.get(key) ?? { date: label, weight: 0, volume: 0 }
       current.weight = Math.max(current.weight, displayWeight(entry.weightKg, unit))
       current.volume += displayWeight(entry.weightKg, unit) * entry.reps * entry.sets
       byDay.set(key, current)
     })
     return Array.from(byDay.values()).map((item) => ({ ...item, weight: round(item.weight), volume: Math.round(item.volume) }))
-  }, [selectedLogs, unit])
+  }, [selectedLogs, unit, locale])
 
   if (!logs.length) {
-    return <EmptyState icon={TrendingUp} title="Your trends start with one log" text="Choose an exercise, record your working weight, and MuscleMap will build the chart." action="Explore exercises" onAction={onExplore} />
+    return <EmptyState icon={TrendingUp} title={t('progress.emptyTitle')} text={t('progress.emptyText')} action={t('progress.explore')} onAction={onExplore} />
   }
 
   const bestWeight = Math.max(...selectedLogs.map((entry) => displayWeight(entry.weightKg, unit)))
@@ -626,25 +698,28 @@ function ProgressScreen({
     <div className="progress-layout">
       <div className="progress-controls">
         <label>
-          Exercise
+          {t('progress.exercise')}
           <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            {exerciseIds.map((id) => <option key={id} value={id}>{exerciseById.get(id)?.name ?? 'Exercise'}</option>)}
+            {exerciseIds.map((id) => {
+              const exercise = exerciseById.get(id)
+              return <option key={id} value={id}>{exercise ? localizeExercise(exercise, language).name : t('exercise.fallback')}</option>
+            })}
           </select>
         </label>
-        <div className="unit-toggle" aria-label="Display unit">
+        <div className="unit-toggle" aria-label={t('progress.unit')}>
           <button className={unit === 'kg' ? 'selected' : ''} onClick={() => setUnit('kg')}>kg</button>
           <button className={unit === 'lb' ? 'selected' : ''} onClick={() => setUnit('lb')}>lb</button>
         </div>
       </div>
 
       <div className="metric-grid">
-        <Metric icon={Dumbbell} label="Best weight" value={`${round(bestWeight)} ${unit}`} />
-        <Metric icon={Layers3} label="Total volume" value={`${Math.round(totalVolume).toLocaleString()} ${unit}`} />
-        <Metric icon={CheckCircle2} label="Working sets" value={String(totalSets)} />
+        <Metric icon={Dumbbell} label={t('progress.best')} value={`${round(bestWeight)} ${unit}`} />
+        <Metric icon={Layers3} label={t('progress.volume')} value={`${Math.round(totalVolume).toLocaleString(locale)} ${unit}`} />
+        <Metric icon={CheckCircle2} label={t('progress.sets')} value={String(totalSets)} />
       </div>
 
       <Suspense fallback={<ChartSkeleton />}>
-        <ProgressCharts data={chartData} unit={unit} />
+        <ProgressCharts data={chartData} unit={unit} language={language} />
       </Suspense>
     </div>
   )
@@ -655,7 +730,8 @@ function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string;
 }
 
 function ChartSkeleton() {
-  return <div className="chart-skeleton" aria-label="Loading charts"><span /><span /><span /></div>
+  const { t } = useLanguage()
+  return <div className="chart-skeleton" aria-label={t('progress.loading')}><span /><span /><span /></div>
 }
 
 function HistoryScreen({
@@ -671,45 +747,53 @@ function HistoryScreen({
   onClear: () => void
   onExplore: () => void
 }) {
+  const { language, t } = useLanguage()
+  const locale = language === 'ar' ? 'ar-SA' : 'en-US'
   const [query, setQuery] = useState('')
   const filtered = logs
-    .filter((entry) => (exerciseById.get(entry.exerciseId)?.name ?? '').toLowerCase().includes(query.toLowerCase()))
+    .filter((entry) => {
+      const exercise = exerciseById.get(entry.exerciseId)
+      if (!exercise) return false
+      return `${exercise.name} ${localizeExercise(exercise, language).name}`.toLowerCase().includes(query.toLowerCase())
+    })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const grouped = filtered.reduce<Record<string, LogEntry[]>>((groups, entry) => {
-    const key = new Date(entry.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+    const key = new Date(entry.date).toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })
     groups[key] = [...(groups[key] ?? []), entry]
     return groups
   }, {})
 
   if (!logs.length) {
-    return <EmptyState icon={History} title="Nothing logged yet" text="Your sets will appear here with their weight, reps, volume, and training date." action="Find an exercise" onAction={onExplore} />
+    return <EmptyState icon={History} title={t('history.emptyTitle')} text={t('history.emptyText')} action={t('history.find')} onAction={onExplore} />
   }
 
   return (
     <div className="history-layout">
       <div className="history-toolbar">
-        <label className="history-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter exercise history" /></label>
-        <button className="danger-ghost" onClick={onClear}><Trash2 size={16} /> Clear data</button>
+        <label className="history-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('history.filter')} /></label>
+        <button className="danger-ghost" onClick={onClear}><Trash2 size={16} /> {t('history.clear')}</button>
       </div>
 
       {!filtered.length ? (
-        <div className="inline-empty">No exercise names match “{query}”.</div>
+        <div className="inline-empty">{t('history.noMatch', { query })}</div>
       ) : Object.entries(grouped).map(([date, entries]) => (
         <section className="history-group" key={date}>
-          <div className="history-date"><span>{date}</span><small>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</small></div>
+          <div className="history-date"><span>{date}</span><small>{entries.length} {entries.length === 1 ? t('history.entry') : t('history.entries')}</small></div>
           <div className="history-list">
             {entries.map((entry) => {
               const movement = exerciseById.get(entry.exerciseId)
               const muscle = movement ? muscleById.get(movement.primaryMuscleId) : null
+              const localizedMovement = movement ? localizeExercise(movement, language) : null
+              const localizedMuscle = muscle ? localizeMuscle(muscle, language) : null
               const weight = round(displayWeight(entry.weightKg, unit))
               const volume = Math.round(weight * entry.reps * entry.sets)
               return (
                 <article className="history-row" key={entry.id}>
                   <div className="history-icon"><Dumbbell size={18} /></div>
-                  <div className="history-copy"><strong>{movement?.name ?? 'Exercise'}</strong><small>{muscle?.name ?? 'Muscle'} · {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</small>{entry.note && <p>{entry.note}</p>}</div>
-                  <div className="history-numbers"><strong>{weight} {unit}</strong><small>{entry.sets} × {entry.reps} · {volume.toLocaleString()} vol</small></div>
-                  <button className="delete-row" onClick={() => deleteLog(entry.id)} aria-label={`Delete ${movement?.name ?? 'exercise'} entry`}><Trash2 size={17} /></button>
+                  <div className="history-copy"><strong>{localizedMovement?.name ?? t('exercise.fallback')}</strong><small>{localizedMuscle?.name ?? t('history.muscle')} · {new Date(entry.date).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}</small>{entry.note && <p>{entry.note}</p>}</div>
+                  <div className="history-numbers"><strong>{weight} {unit}</strong><small>{entry.sets} × {entry.reps} · {volume.toLocaleString(locale)} {t('history.volumeShort')}</small></div>
+                  <button className="delete-row" onClick={() => deleteLog(entry.id)} aria-label={t('history.delete', { exercise: localizedMovement?.name ?? t('exercise.fallback') })}><Trash2 size={17} /></button>
                 </article>
               )
             })}
@@ -746,34 +830,37 @@ function DialogFrame({ children, onClose, className = '' }: { children: React.Re
 }
 
 function ExerciseDialog({ exercise, onClose, onLog }: { exercise: Exercise; onClose: () => void; onLog: () => void }) {
+  const { language, t } = useLanguage()
   const muscle = muscleById.get(exercise.primaryMuscleId)!
+  const localizedExercise = localizeExercise(exercise, language)
+  const localizedMuscle = localizeMuscle(muscle, language)
   return (
     <DialogFrame onClose={onClose} className="exercise-dialog">
       <div className="dialog-topline">
-        <button className="icon-button" onClick={onClose} aria-label="Close exercise"><ArrowLeft size={20} /></button>
-        <span>Exercise guide</span>
-        <button className="icon-button" onClick={onClose} aria-label="Close exercise"><X size={20} /></button>
+        <button className="icon-button" onClick={onClose} aria-label={t('exercise.close')}><ArrowLeft size={20} /></button>
+        <span>{t('exercise.guide')}</span>
+        <button className="icon-button" onClick={onClose} aria-label={t('exercise.close')}><X size={20} /></button>
       </div>
       <div className="exercise-hero">
         <div className="exercise-symbol"><Dumbbell size={34} /></div>
-        <div><div className="eyebrow">{muscle.group} · {exercise.level}</div><h2>{exercise.name}</h2><p>{exercise.equipment}</p></div>
+        <div><div className="eyebrow">{localizedMuscle.group} · {localizeLevel(exercise.level, language)}</div><h2>{localizedExercise.name}</h2><p>{localizedExercise.equipment}</p></div>
       </div>
-      <div className="target-card"><Target size={19} /><div><small>Primary target</small><strong>{muscle.family} · {targetTitle(muscle)}</strong></div><p>{muscle.function}</p></div>
+      <div className="target-card"><Target size={19} /><div><small>{t('exercise.primaryTarget')}</small><strong>{localizedMuscle.family} · {targetTitle(localizedMuscle)}</strong></div><p>{localizedMuscle.function}</p></div>
       <div className="guide-grid">
         <div>
-          <div className="section-heading"><span>How to perform it</span></div>
+          <div className="section-heading"><span>{t('exercise.how')}</span></div>
           <ol className="cue-list">
-            {exercise.cues.map((cue, index) => <li key={cue}><span>{index + 1}</span><p>{cue}</p></li>)}
+            {localizedExercise.cues.map((cue, index) => <li key={cue}><span>{index + 1}</span><p>{cue}</p></li>)}
           </ol>
         </div>
         <div>
-          <div className="section-heading"><span>Common mistakes</span></div>
+          <div className="section-heading"><span>{t('exercise.mistakes')}</span></div>
           <ul className="mistake-list">
-            {exercise.mistakes.map((mistake) => <li key={mistake}><ShieldAlert size={17} /><span>{mistake}</span></li>)}
+            {localizedExercise.mistakes.map((mistake) => <li key={mistake}><ShieldAlert size={17} /><span>{mistake}</span></li>)}
           </ul>
         </div>
       </div>
-      <button className="primary-button full" onClick={onLog}><BookOpen size={18} /> Log this exercise</button>
+      <button className="primary-button full" onClick={onLog}><BookOpen size={18} /> {t('exercise.log')}</button>
     </DialogFrame>
   )
 }
@@ -791,6 +878,8 @@ function LogDialog({
   onClose: () => void
   onSave: (entry: LogEntry) => void
 }) {
+  const { language, t } = useLanguage()
+  const localizedExercise = localizeExercise(exercise, language)
   const latest = logs.filter((entry) => entry.exerciseId === exercise.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
   const [unit, setUnit] = useState<Unit>(initialUnit)
   const [weight, setWeight] = useState(latest ? String(round(displayWeight(latest.weightKg, initialUnit))) : '')
@@ -812,7 +901,7 @@ function LogDialog({
     const numericReps = Number(reps)
     const numericSets = Number(sets)
     if (!(numericWeight > 0) || !(numericReps > 0) || !(numericSets > 0) || !Number.isInteger(numericReps) || !Number.isInteger(numericSets)) {
-      setError('Enter a valid weight and whole numbers for reps and sets.')
+      setError(t('log.error'))
       return
     }
     onSave({
@@ -828,34 +917,35 @@ function LogDialog({
 
   return (
     <DialogFrame onClose={onClose} className="log-dialog">
-      <div className="dialog-topline compact"><div><div className="eyebrow">Quick log</div><h2>{exercise.name}</h2></div><button className="icon-button" onClick={onClose} aria-label="Close log form"><X size={20} /></button></div>
-      {latest && <div className="last-session"><History size={17} /><span>Last time: {round(displayWeight(latest.weightKg, unit))} {unit} · {latest.sets} × {latest.reps}</span></div>}
+      <div className="dialog-topline compact"><div><div className="eyebrow">{t('log.quick')}</div><h2>{localizedExercise.name}</h2></div><button className="icon-button" onClick={onClose} aria-label={t('log.close')}><X size={20} /></button></div>
+      {latest && <div className="last-session"><History size={17} /><span>{t('log.last')}: {round(displayWeight(latest.weightKg, unit))} {unit} · {latest.sets} × {latest.reps}</span></div>}
       <form onSubmit={submit}>
-        <div className="unit-toggle wide" aria-label="Weight unit">
-          <button type="button" className={unit === 'kg' ? 'selected' : ''} onClick={() => changeUnit('kg')}>Kilograms</button>
-          <button type="button" className={unit === 'lb' ? 'selected' : ''} onClick={() => changeUnit('lb')}>Pounds</button>
+        <div className="unit-toggle wide" aria-label={t('log.unit')}>
+          <button type="button" className={unit === 'kg' ? 'selected' : ''} onClick={() => changeUnit('kg')}>{t('log.kilograms')}</button>
+          <button type="button" className={unit === 'lb' ? 'selected' : ''} onClick={() => changeUnit('lb')}>{t('log.pounds')}</button>
         </div>
         <div className="number-grid">
-          <label>Weight ({unit})<input autoFocus inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="0" /></label>
-          <label>Reps<input inputMode="numeric" value={reps} onChange={(event) => setReps(event.target.value)} /></label>
-          <label>Sets<input inputMode="numeric" value={sets} onChange={(event) => setSets(event.target.value)} /></label>
+          <label>{t('log.weight')} ({unit})<input autoFocus inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="0" /></label>
+          <label>{t('log.reps')}<input inputMode="numeric" value={reps} onChange={(event) => setReps(event.target.value)} /></label>
+          <label>{t('log.sets')}<input inputMode="numeric" value={sets} onChange={(event) => setSets(event.target.value)} /></label>
         </div>
-        <label className="field-label">Date and time<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-        <label className="field-label">Note <span>optional</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Tempo, form, or how the set felt" rows={2} /></label>
+        <label className="field-label">{t('log.date')}<input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <label className="field-label">{t('log.note')} <span>{t('log.optional')}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t('log.notePlaceholder')} rows={2} /></label>
         {error && <div className="form-error"><ShieldAlert size={16} /> {error}</div>}
-        <button className="primary-button full" type="submit"><Check size={18} /> Save workout</button>
+        <button className="primary-button full" type="submit"><Check size={18} /> {t('log.save')}</button>
       </form>
     </DialogFrame>
   )
 }
 
 function ConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const { t } = useLanguage()
   return (
     <DialogFrame onClose={onCancel} className="confirm-dialog">
       <span className="danger-symbol"><Trash2 size={24} /></span>
-      <h2>Clear all training data?</h2>
-      <p>This removes workout history and weekly completion from this device. It cannot be undone.</p>
-      <div className="confirm-actions"><button className="secondary-button" onClick={onCancel}>Cancel</button><button className="danger-button" onClick={onConfirm}>Clear data</button></div>
+      <h2>{t('confirm.title')}</h2>
+      <p>{t('confirm.text')}</p>
+      <div className="confirm-actions"><button className="secondary-button" onClick={onCancel}>{t('confirm.cancel')}</button><button className="danger-button" onClick={onConfirm}>{t('confirm.clear')}</button></div>
     </DialogFrame>
   )
 }

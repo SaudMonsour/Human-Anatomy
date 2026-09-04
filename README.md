@@ -6,6 +6,7 @@ MuscleMap is a responsive anatomy and strength-training tool built with React, T
 
 - Detailed interactive front and back muscle maps with traced muscle overlays
 - Mobile-first exact-target selection for muscle heads, fiber regions, and component muscles
+- Complete English and Arabic interfaces with persistent language choice and native RTL layout
 - Search across 34 muscle regions and 66 exercises
 - Exercise setup cues and common-mistake guidance
 - Four-day upper/lower program with weekly completion tracking
@@ -28,7 +29,7 @@ npm run check:data
 npm run build
 ```
 
-`check:data` verifies that every target has structured anatomy metadata and an exercise, and that every program item points to a valid exercise.
+`check:data` verifies that every target has structured anatomy metadata and an exercise, every program item points to a valid exercise, and every muscle and exercise has Arabic content.
 
 ## Data and privacy
 

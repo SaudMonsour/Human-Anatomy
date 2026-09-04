@@ -3,6 +3,7 @@ import { muscleById, type BodySide, type Muscle } from './data'
 import { RICH_BACK_MUSCLES } from './richAnatomyBack'
 import { RICH_FRONT_MUSCLES } from './richAnatomyFront'
 import type { RichMuscleDefinition } from './richAnatomyTypes'
+import { localizeMuscle, translate, type Language } from './i18n'
 
 const PX2MM = 25.4 / 96
 const VIEWBOX_WIDTH = 361.15625
@@ -47,12 +48,14 @@ export function AnatomyBody({
   visibleMuscles,
   selectedMuscleId,
   onSelect,
+  language,
   mobileFooter,
 }: {
   side: BodySide
   visibleMuscles: Muscle[]
   selectedMuscleId: string
   onSelect: (muscle: Muscle) => void
+  language: Language
   mobileFooter?: ReactNode
 }) {
   const visibleIds = new Set(visibleMuscles.map((muscle) => muscle.id))
@@ -61,8 +64,8 @@ export function AnatomyBody({
   return (
     <div className="body-stage">
       <div className="orientation">
-        <span>{side === 'front' ? 'Anterior' : 'Posterior'}</span>
-        <small>{side === 'front' ? 'Front' : 'Back'} · superficial view</small>
+        <span>{translate(language, side === 'front' ? 'body.anterior' : 'body.posterior')}</span>
+        <small>{translate(language, side === 'front' ? 'body.front' : 'body.back')} · {translate(language, 'body.superficial')}</small>
       </div>
 
       <div className="anatomy-figure">
@@ -70,7 +73,7 @@ export function AnatomyBody({
           viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
           className="body-svg"
           role="img"
-          aria-label={`${side} superficial muscular anatomy map`}
+          aria-label={translate(language, 'body.aria', { side: translate(language, side === 'front' ? 'body.front' : 'body.back') })}
           preserveAspectRatio="xMidYMid meet"
         >
           <image
@@ -92,9 +95,14 @@ export function AnatomyBody({
               const targetId = selectedMuscleId && activeTargets.includes(selectedMuscleId)
                 ? selectedMuscleId
                 : activeTargets[0]
-              const mappedMuscle = targetId ? muscleById.get(targetId) : undefined
+              const sourceMuscle = targetId ? muscleById.get(targetId) : undefined
+              const mappedMuscle = sourceMuscle ? localizeMuscle(sourceMuscle, language) : undefined
               const label = mappedMuscle
-                ? `${region.name}: ${activeTargets.length} exact ${activeTargets.length === 1 ? 'target' : 'targets'}, currently ${mappedMuscle.part}`
+                ? translate(language, activeTargets.length === 1 ? 'body.currentTargetOne' : 'body.currentTarget', {
+                    region: mappedMuscle.group,
+                    count: activeTargets.length,
+                    part: mappedMuscle.part,
+                  })
                 : region.name
 
               return (
@@ -128,10 +136,10 @@ export function AnatomyBody({
       </div>
 
       <div className="anatomy-key" aria-hidden="true">
-        <span><i className="key-selected" />Selected target</span>
-        <span><i className="key-muscle" />Muscle overlay</span>
+        <span><i className="key-selected" />{translate(language, 'body.selected')}</span>
+        <span><i className="key-muscle" />{translate(language, 'body.overlay')}</span>
       </div>
-      <div className="diagram-hint"><span className="pulse-dot" /> Select a muscle region</div>
+      <div className="diagram-hint"><span className="pulse-dot" /> {translate(language, 'body.hint')}</div>
       {mobileFooter}
     </div>
   )
