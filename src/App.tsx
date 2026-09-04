@@ -1,4 +1,4 @@
-import { createContext, FormEvent, lazy, Suspense, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, FormEvent, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowLeft,
@@ -94,6 +94,10 @@ const kgToLb = (kg: number) => kg * 2.20462
 const displayWeight = (kg: number, unit: Unit) => unit === 'kg' ? kg : kgToLb(kg)
 const round = (value: number, places = 1) => Number(value.toFixed(places))
 
+const tapFeedback = () => {
+  if (window.matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(8)
+}
+
 const targetTitle = (muscle: Muscle) => muscle.part.startsWith('Whole ') ? muscle.name : muscle.part
 const targetKindLabel = (muscle: Muscle, language: Language) => translate(language, ({
   head: 'target.head',
@@ -166,9 +170,13 @@ function App() {
     })
   }
 
-  const openExercise = (item: Exercise) => setSelectedExercise(item)
+  const openExercise = (item: Exercise) => {
+    tapFeedback()
+    setSelectedExercise(item)
+  }
 
   const saveLog = (entry: LogEntry) => {
+    tapFeedback()
     setLogs((current) => [...current, entry])
     setLogExercise(null)
     const exercise = exerciseById.get(entry.exerciseId)
@@ -190,6 +198,7 @@ function App() {
   }
 
   const toggleProgramItem = (itemId: string) => {
+    tapFeedback()
     const key = `${weekKey()}:${itemId}`
     setCompleted((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
   }
@@ -201,6 +210,14 @@ function App() {
     setToast({ message: t('toast.cleared') })
   }
 
+  const changeTab = (nextTab: Tab) => {
+    if (nextTab === tab) return
+    tapFeedback()
+    setTab(nextTab)
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior }))
+  }
+
   const copy = {
     eyebrow: t(`tab.${tab}.eyebrow` as TranslationKey),
     title: t(`tab.${tab}.title` as TranslationKey),
@@ -210,7 +227,7 @@ function App() {
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
     <div className="app-shell" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <Sidebar tab={tab} setTab={setTab} />
+      <Sidebar tab={tab} setTab={changeTab} />
       <div className="app-main">
         <header className="topbar">
           <div>
@@ -219,7 +236,7 @@ function App() {
             <p>{copy.description}</p>
           </div>
           <div className="topbar-actions">
-            <button className="language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={t('language.switch')}>
+            <button className="language-toggle" onClick={() => { tapFeedback(); setLanguage(language === 'en' ? 'ar' : 'en') }} aria-label={t('language.switch')}>
               <Languages size={18} /><span>{t('language.next')}</span>
             </button>
             <div className="brand-mark" aria-label="MuscleMap"><Activity size={22} /><span>MM</span></div>
@@ -227,38 +244,40 @@ function App() {
         </header>
 
         <main className="page-content">
-          {tab === 'explore' && (
-            <ExploreScreen
-              side={side}
-              setSide={changeSide}
-              selectedMuscleId={selectedMuscleId}
-              openMuscle={openMuscle}
-              openExercise={openExercise}
-            />
-          )}
-          {tab === 'program' && (
-            <ProgramScreen
-              completed={completed}
-              toggleItem={toggleProgramItem}
-              openExercise={openExercise}
-            />
-          )}
-          {tab === 'progress' && (
-            <ProgressScreen logs={logs} unit={unit} setUnit={setUnit} onExplore={() => setTab('explore')} />
-          )}
-          {tab === 'history' && (
-            <HistoryScreen
-              logs={logs}
-              unit={unit}
-              deleteLog={deleteLog}
-              onClear={() => setConfirmReset(true)}
-              onExplore={() => setTab('explore')}
-            />
-          )}
+          <div className="screen-enter" key={tab}>
+            {tab === 'explore' && (
+              <ExploreScreen
+                side={side}
+                setSide={changeSide}
+                selectedMuscleId={selectedMuscleId}
+                openMuscle={openMuscle}
+                openExercise={openExercise}
+              />
+            )}
+            {tab === 'program' && (
+              <ProgramScreen
+                completed={completed}
+                toggleItem={toggleProgramItem}
+                openExercise={openExercise}
+              />
+            )}
+            {tab === 'progress' && (
+              <ProgressScreen logs={logs} unit={unit} setUnit={setUnit} onExplore={() => changeTab('explore')} />
+            )}
+            {tab === 'history' && (
+              <HistoryScreen
+                logs={logs}
+                unit={unit}
+                deleteLog={deleteLog}
+                onClear={() => setConfirmReset(true)}
+                onExplore={() => changeTab('explore')}
+              />
+            )}
+          </div>
         </main>
       </div>
 
-      <MobileNav tab={tab} setTab={setTab} />
+      <MobileNav tab={tab} setTab={changeTab} />
 
       {selectedExercise && (
         <ExerciseDialog
@@ -304,7 +323,7 @@ function Sidebar({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
       <div className="wordmark"><span><Activity size={20} /></span><strong>MuscleMap</strong></div>
       <nav aria-label={t('nav.label')}>
         {navItems.map(({ id, icon: Icon }) => (
-          <button key={id} className={tab === id ? 'nav-item active' : 'nav-item'} onClick={() => setTab(id)}>
+          <button key={id} className={tab === id ? 'nav-item active' : 'nav-item'} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
             <Icon size={19} /><span>{t(`nav.${id}` as TranslationKey)}</span>
           </button>
         ))}
@@ -319,7 +338,7 @@ function MobileNav({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
   return (
     <nav className="mobile-nav" aria-label={t('nav.label')}>
       {navItems.map(({ id, icon: Icon }) => (
-        <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
+        <button key={id} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
           <Icon size={20} /><span>{t(`nav.${id}` as TranslationKey)}</span>
         </button>
       ))}
@@ -346,10 +365,25 @@ function ExploreScreen({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [mobileTargetsOpen, setMobileTargetsOpen] = useState(false)
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
+  const groupFilterRef = useRef<HTMLDivElement>(null)
   const groups = ['All', ...Array.from(new Set(muscles.filter((muscle) => muscle.side === side).map((muscle) => muscle.group)))]
   const selected = muscleById.get(selectedMuscleId) ?? muscles[0]
   const selectedText = localizeMuscle(selected, language)
   const familyTargets = targetsForFamily(selected.family)
+  const selectMuscle = (muscle: Muscle) => {
+    if (muscle.id !== selected.id) tapFeedback()
+    openMuscle(muscle)
+  }
+
+  useEffect(() => {
+    const container = groupFilterRef.current
+    const active = groupFilterRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')
+    if (!container || !active) return
+    const containerRect = container.getBoundingClientRect()
+    const activeRect = active.getBoundingClientRect()
+    const left = activeRect.left - containerRect.left - (containerRect.width - activeRect.width) / 2
+    container.scrollBy({ left, behavior: 'smooth' })
+  }, [group, side, language])
   const groupLabel = (item: string) => {
     if (item === 'All') return t('filter.all')
     const representative = muscles.find((muscle) => muscle.group === item)
@@ -385,6 +419,7 @@ function ExploreScreen({
   const visible = muscles.filter((muscle) => muscle.side === side && (group === 'All' || muscle.group === group))
 
   const changeBodySide = (nextSide: BodySide) => {
+    if (nextSide !== side) tapFeedback()
     const nextGroup = group === 'All' || muscles.some((muscle) => muscle.side === nextSide && muscle.group === group)
       ? group
       : 'All'
@@ -395,6 +430,7 @@ function ExploreScreen({
   }
 
   const changeGroup = (nextGroup: string) => {
+    if (nextGroup !== group) tapFeedback()
     setGroup(nextGroup)
     const nextMuscle = muscles.find((muscle) => muscle.side === side && (nextGroup === 'All' || muscle.group === nextGroup))
     if (nextMuscle) openMuscle(nextMuscle)
@@ -420,7 +456,7 @@ function ExploreScreen({
                 <button key={`${result.kind}:${result.id}`} onClick={() => {
                   if (result.kind === 'muscle') {
                     setGroup('All')
-                    openMuscle(muscleById.get(result.id)!)
+                    selectMuscle(muscleById.get(result.id)!)
                   }
                   else openExercise(exerciseById.get(result.id)!)
                   setQuery('')
@@ -444,6 +480,7 @@ function ExploreScreen({
           <button
             className={mobileSearchOpen ? 'mobile-search-toggle active' : 'mobile-search-toggle'}
             onClick={() => {
+              tapFeedback()
               setMobileSearchOpen((open) => !open)
               if (mobileSearchOpen) setQuery('')
             }}
@@ -454,32 +491,33 @@ function ExploreScreen({
           </button>
         </div>
 
-        <div className="group-filter" aria-label={t('filter.label')}>
-          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{groupLabel(item)}</button>)}
+        <div className="group-filter" ref={groupFilterRef} aria-label={t('filter.label')}>
+          {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} aria-pressed={group === item} onClick={() => changeGroup(item)}>{groupLabel(item)}</button>)}
         </div>
 
-        {familyTargets.length > 1 && (
-          <button
-            className="mobile-target-trigger"
-            onClick={() => setMobileTargetsOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={mobileTargetsOpen}
-            aria-label={t('target.choose', { family: selectedText.family })}
-          >
-            <span className="mobile-target-icon"><Target size={19} /></span>
-            <span className="mobile-target-copy">
-              <small>{t('target.exact')} · {selectedText.family}</small>
-              <strong>{targetTitle(selectedText)}</strong>
-            </span>
-            <ChevronRight size={19} />
-          </button>
-        )}
+        <button
+          className="mobile-target-trigger"
+          onClick={() => {
+            tapFeedback()
+            setMobileTargetsOpen(true)
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={mobileTargetsOpen}
+          aria-label={t('target.choose', { family: selectedText.family })}
+        >
+          <span className="mobile-target-icon"><Target size={19} /></span>
+          <span className="mobile-target-copy" key={selected.id}>
+            <small>{t('target.exact')} · {selectedText.family}</small>
+            <strong>{targetTitle(selectedText)}</strong>
+          </span>
+          <ChevronRight size={19} />
+        </button>
 
         <AnatomyBody
           side={side}
           visibleMuscles={visible}
           selectedMuscleId={selectedMuscleId}
-          onSelect={openMuscle}
+          onSelect={selectMuscle}
           onSwipeSide={changeBodySide}
           language={language}
           mobileFooter={(
@@ -489,7 +527,7 @@ function ExploreScreen({
               aria-haspopup="dialog"
               aria-expanded={mobileDetailsOpen}
             >
-              <span className="mobile-summary-copy" aria-live="polite">
+              <span className="mobile-summary-copy" key={selected.id} aria-live="polite">
                 <small>{selectedText.family} · {targetKindLabel(selectedText, language)}</small>
                 <strong>{targetTitle(selectedText)}</strong>
               </span>
@@ -500,7 +538,7 @@ function ExploreScreen({
       </section>
 
       <aside className="muscle-panel desktop-muscle-panel">
-        <MuscleDetails selected={selected} openMuscle={openMuscle} openExercise={openExercise} />
+        <MuscleDetails selected={selected} openMuscle={selectMuscle} openExercise={openExercise} />
       </aside>
 
       {mobileTargetsOpen && (
@@ -514,7 +552,7 @@ function ExploreScreen({
             selected={selected}
             targets={familyTargets}
             openMuscle={(muscle) => {
-              openMuscle(muscle)
+              selectMuscle(muscle)
               setMobileTargetsOpen(false)
             }}
             variant="sheet"
@@ -531,7 +569,7 @@ function ExploreScreen({
           </div>
           <MuscleDetails
             selected={selected}
-            openMuscle={openMuscle}
+            openMuscle={selectMuscle}
             openExercise={(exercise) => {
               setMobileDetailsOpen(false)
               openExercise(exercise)

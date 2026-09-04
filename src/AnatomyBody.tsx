@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type TouchEvent } from 'react'
+import { useEffect, useRef, type ReactNode, type TouchEvent } from 'react'
 import { muscleById, type BodySide, type Muscle } from './data'
 import { RICH_BACK_MUSCLES } from './richAnatomyBack'
 import { RICH_FRONT_MUSCLES } from './richAnatomyFront'
@@ -64,6 +64,14 @@ export function AnatomyBody({
   const regions = richMusclesForSide(side)
   const touchStart = useRef<{ x: number; y: number } | null>(null)
 
+  useEffect(() => {
+    Object.values(BODY_IMAGES).forEach((source) => {
+      const image = new Image()
+      image.decoding = 'async'
+      image.src = source
+    })
+  }, [])
+
   const startSwipe = (event: TouchEvent<HTMLDivElement>) => {
     const touch = event.touches[0]
     touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
@@ -97,61 +105,63 @@ export function AnatomyBody({
           aria-label={translate(language, 'body.aria', { side: translate(language, side === 'front' ? 'body.front' : 'body.back') })}
           preserveAspectRatio="xMidYMid meet"
         >
-          <image
-            href={BODY_IMAGES[side]}
-            x="0"
-            y="0"
-            width={VIEWBOX_WIDTH}
-            height={VIEWBOX_HEIGHT}
-            preserveAspectRatio="xMidYMid meet"
-            className="body-render"
-            aria-hidden="true"
-          />
-          <g className="rich-muscle-layer">
-            {regions.map((region) => {
-              const candidates = appTargetsForRegion(region, side)
-              const activeTargets = candidates.filter((id) => visibleIds.has(id))
-              const selected = activeTargets.includes(selectedMuscleId)
-              const interactive = activeTargets.length > 0
-              const targetId = selectedMuscleId && activeTargets.includes(selectedMuscleId)
-                ? selectedMuscleId
-                : activeTargets[0]
-              const sourceMuscle = targetId ? muscleById.get(targetId) : undefined
-              const mappedMuscle = sourceMuscle ? localizeMuscle(sourceMuscle, language) : undefined
-              const label = mappedMuscle
-                ? translate(language, activeTargets.length === 1 ? 'body.currentTargetOne' : 'body.currentTarget', {
-                    region: mappedMuscle.group,
-                    count: activeTargets.length,
-                    part: mappedMuscle.part,
-                  })
-                : region.name
+          <g key={side} className="body-side-layer">
+            <image
+              href={BODY_IMAGES[side]}
+              x="0"
+              y="0"
+              width={VIEWBOX_WIDTH}
+              height={VIEWBOX_HEIGHT}
+              preserveAspectRatio="xMidYMid meet"
+              className="body-render"
+              aria-hidden="true"
+            />
+            <g className="rich-muscle-layer">
+              {regions.map((region) => {
+                const candidates = appTargetsForRegion(region, side)
+                const activeTargets = candidates.filter((id) => visibleIds.has(id))
+                const selected = activeTargets.includes(selectedMuscleId)
+                const interactive = activeTargets.length > 0
+                const targetId = selectedMuscleId && activeTargets.includes(selectedMuscleId)
+                  ? selectedMuscleId
+                  : activeTargets[0]
+                const sourceMuscle = targetId ? muscleById.get(targetId) : undefined
+                const mappedMuscle = sourceMuscle ? localizeMuscle(sourceMuscle, language) : undefined
+                const label = mappedMuscle
+                  ? translate(language, activeTargets.length === 1 ? 'body.currentTargetOne' : 'body.currentTarget', {
+                      region: mappedMuscle.group,
+                      count: activeTargets.length,
+                      part: mappedMuscle.part,
+                    })
+                  : region.name
 
-              return (
-                <path
-                  key={region.id}
-                  d={region.d}
-                  transform={transformFor(region.offset)}
-                  className={`rich-muscle${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}`}
-                  tabIndex={interactive ? 0 : undefined}
-                  role={interactive ? 'button' : undefined}
-                  aria-label={interactive ? label : undefined}
-                  aria-hidden={interactive ? undefined : true}
-                  onClick={interactive && targetId ? () => {
-                    const muscle = muscleById.get(targetId)
-                    if (muscle) onSelect(muscle)
-                  } : undefined}
-                  onKeyDown={interactive && targetId ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
+                return (
+                  <path
+                    key={region.id}
+                    d={region.d}
+                    transform={transformFor(region.offset)}
+                    className={`rich-muscle${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}`}
+                    tabIndex={interactive ? 0 : undefined}
+                    role={interactive ? 'button' : undefined}
+                    aria-label={interactive ? label : undefined}
+                    aria-hidden={interactive ? undefined : true}
+                    onClick={interactive && targetId ? () => {
                       const muscle = muscleById.get(targetId)
                       if (muscle) onSelect(muscle)
-                    }
-                  } : undefined}
-                >
-                  <title>{label}</title>
-                </path>
-              )
-            })}
+                    } : undefined}
+                    onKeyDown={interactive && targetId ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        const muscle = muscleById.get(targetId)
+                        if (muscle) onSelect(muscle)
+                      }
+                    } : undefined}
+                  >
+                    <title>{label}</title>
+                  </path>
+                )
+              })}
+            </g>
           </g>
         </svg>
       </div>
