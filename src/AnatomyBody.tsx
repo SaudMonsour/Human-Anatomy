@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode, type TouchEvent } from 'react'
 import { muscleById, type BodySide, type Muscle } from './data'
 import { RICH_BACK_MUSCLES } from './richAnatomyBack'
 import { RICH_FRONT_MUSCLES } from './richAnatomyFront'
@@ -48,6 +48,7 @@ export function AnatomyBody({
   visibleMuscles,
   selectedMuscleId,
   onSelect,
+  onSwipeSide,
   language,
   mobileFooter,
 }: {
@@ -55,14 +56,34 @@ export function AnatomyBody({
   visibleMuscles: Muscle[]
   selectedMuscleId: string
   onSelect: (muscle: Muscle) => void
+  onSwipeSide?: (side: BodySide) => void
   language: Language
   mobileFooter?: ReactNode
 }) {
   const visibleIds = new Set(visibleMuscles.map((muscle) => muscle.id))
   const regions = richMusclesForSide(side)
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  const startSwipe = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0]
+    touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+  }
+
+  const finishSwipe = (event: TouchEvent<HTMLDivElement>) => {
+    const start = touchStart.current
+    const touch = event.changedTouches[0]
+    touchStart.current = null
+    if (!start || !touch || !onSwipeSide) return
+    const deltaX = touch.clientX - start.x
+    const deltaY = touch.clientY - start.y
+    if (Math.abs(deltaX) >= 56 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      event.preventDefault()
+      onSwipeSide(side === 'front' ? 'back' : 'front')
+    }
+  }
 
   return (
-    <div className="body-stage">
+    <div className="body-stage" onTouchStart={startSwipe} onTouchEnd={finishSwipe}>
       <div className="orientation">
         <span>{translate(language, side === 'front' ? 'body.anterior' : 'body.posterior')}</span>
         <small>{translate(language, side === 'front' ? 'body.front' : 'body.back')} · {translate(language, 'body.superficial')}</small>

@@ -343,6 +343,8 @@ function ExploreScreen({
   const { language, t } = useLanguage()
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState('All')
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [mobileTargetsOpen, setMobileTargetsOpen] = useState(false)
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const groups = ['All', ...Array.from(new Set(muscles.filter((muscle) => muscle.side === side).map((muscle) => muscle.group)))]
   const selected = muscleById.get(selectedMuscleId) ?? muscles[0]
@@ -401,9 +403,11 @@ function ExploreScreen({
   return (
     <div className="explore-layout">
       <section className="explorer-card">
-        <div className="search-wrap">
+        <div className={`search-wrap${mobileSearchOpen ? ' mobile-search-open' : ''}`}>
           <Search size={18} />
           <input
+            key={mobileSearchOpen ? 'mobile-open' : 'default'}
+            autoFocus={mobileSearchOpen}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('search.placeholder')}
@@ -420,6 +424,7 @@ function ExploreScreen({
                   }
                   else openExercise(exerciseById.get(result.id)!)
                   setQuery('')
+                  setMobileSearchOpen(false)
                 }}>
                   <span className="result-icon">{result.kind === 'muscle' ? <Target size={17} /> : <Dumbbell size={17} />}</span>
                   <span><strong>{result.title}</strong><small>{result.meta}</small></span>
@@ -436,24 +441,46 @@ function ExploreScreen({
             <button className={side === 'back' ? 'selected' : ''} onClick={() => changeBodySide('back')}>{t('body.back')}</button>
           </div>
           <div className="view-label"><Layers3 size={16} /> {t('body.targetCount', { count: visible.length })}</div>
+          <button
+            className={mobileSearchOpen ? 'mobile-search-toggle active' : 'mobile-search-toggle'}
+            onClick={() => {
+              setMobileSearchOpen((open) => !open)
+              if (mobileSearchOpen) setQuery('')
+            }}
+            aria-label={t('search.label')}
+            aria-expanded={mobileSearchOpen}
+          >
+            {mobileSearchOpen ? <X size={19} /> : <Search size={19} />}
+          </button>
         </div>
 
         <div className="group-filter" aria-label={t('filter.label')}>
           {groups.map((item) => <button key={item} className={group === item ? 'selected' : ''} onClick={() => changeGroup(item)}>{groupLabel(item)}</button>)}
         </div>
 
-        <ExactTargetPicker
-          selected={selected}
-          targets={familyTargets}
-          openMuscle={openMuscle}
-          variant="mobile-bar"
-        />
+        {familyTargets.length > 1 && (
+          <button
+            className="mobile-target-trigger"
+            onClick={() => setMobileTargetsOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={mobileTargetsOpen}
+            aria-label={t('target.choose', { family: selectedText.family })}
+          >
+            <span className="mobile-target-icon"><Target size={19} /></span>
+            <span className="mobile-target-copy">
+              <small>{t('target.exact')} · {selectedText.family}</small>
+              <strong>{targetTitle(selectedText)}</strong>
+            </span>
+            <ChevronRight size={19} />
+          </button>
+        )}
 
         <AnatomyBody
           side={side}
           visibleMuscles={visible}
           selectedMuscleId={selectedMuscleId}
           onSelect={openMuscle}
+          onSwipeSide={changeBodySide}
           language={language}
           mobileFooter={(
             <button
@@ -462,7 +489,7 @@ function ExploreScreen({
               aria-haspopup="dialog"
               aria-expanded={mobileDetailsOpen}
             >
-              <span className="mobile-summary-copy">
+              <span className="mobile-summary-copy" aria-live="polite">
                 <small>{selectedText.family} · {targetKindLabel(selectedText, language)}</small>
                 <strong>{targetTitle(selectedText)}</strong>
               </span>
@@ -475,6 +502,25 @@ function ExploreScreen({
       <aside className="muscle-panel desktop-muscle-panel">
         <MuscleDetails selected={selected} openMuscle={openMuscle} openExercise={openExercise} />
       </aside>
+
+      {mobileTargetsOpen && (
+        <DialogFrame onClose={() => setMobileTargetsOpen(false)} className="target-picker-drawer">
+          <div className="drawer-handle" aria-hidden="true" />
+          <div className="drawer-topline">
+            <span>{t('target.choose', { family: selectedText.family })}</span>
+            <button className="icon-button" onClick={() => setMobileTargetsOpen(false)} aria-label={t('details.close')}><X size={20} /></button>
+          </div>
+          <ExactTargetPicker
+            selected={selected}
+            targets={familyTargets}
+            openMuscle={(muscle) => {
+              openMuscle(muscle)
+              setMobileTargetsOpen(false)
+            }}
+            variant="sheet"
+          />
+        </DialogFrame>
+      )}
 
       {mobileDetailsOpen && (
         <DialogFrame onClose={() => setMobileDetailsOpen(false)} className="muscle-drawer">
@@ -549,7 +595,7 @@ function ExactTargetPicker({
   selected: Muscle
   targets: Muscle[]
   openMuscle: (muscle: Muscle) => void
-  variant: 'mobile-bar' | 'panel'
+  variant: 'panel' | 'sheet'
 }) {
   const { language, t } = useLanguage()
   const selectedText = localizeMuscle(selected, language)
